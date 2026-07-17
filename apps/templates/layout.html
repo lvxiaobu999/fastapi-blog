@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if title %}
+            FastAPI Blog - {{ title }}
+        {% else %}
+            FastAPI Blog
+        {% endif %}
+    </title>
+    <script>
+        (() => {
+            const savedTheme = localStorage.getItem("blog-theme") || "auto";
+            const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.setAttribute(
+                "data-bs-theme",
+                savedTheme === "auto" ? (isDark ? "dark" : "light") : savedTheme
+            );
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-md blog-navbar" aria-label="主导航">
+        <div class="container-xl">
+            <a class="navbar-brand" href="{{ url_for('home') }}">FastAPI Blog</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#mainNavbar" aria-controls="mainNavbar"
+                    aria-expanded="false" aria-label="展开导航">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNavbar">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="{{ url_for('home') }}">Home</a>
+                    </li>
+                </ul>
+                <div class="navbar-actions">
+                    <a class="btn btn-outline-light" href="#">Login</a>
+                    <a class="btn btn-light" href="#">Register</a>
+                    <div class="dropdown">
+                        <button class="btn theme-toggle dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="选择页面主题">
+                            <span id="themeIcon" aria-hidden="true">◐</span>
+                            <span id="themeLabel">Auto</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button class="dropdown-item theme-option" data-theme="light" type="button">☀ Light</button></li>
+                            <li><button class="dropdown-item theme-option" data-theme="dark" type="button">☾ Dark</button></li>
+                            <li><button class="dropdown-item theme-option" data-theme="auto" type="button">◐ Auto</button></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-xl page-content">
+        {% block content %}
+        {% endblock content %}
+    </main>
+
+    <script src="{{ url_for('static', path='js/jquery-4.0.0.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/theme.js') }}"></script>
+</body>
+</html>
