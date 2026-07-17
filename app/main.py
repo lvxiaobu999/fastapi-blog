@@ -2,10 +2,12 @@ from fastapi import FastAPI, Request, status
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core import get_settings
 from app.routers import api_posts_router, pages_router
 from app.templating import APP_DIR, templates
 
-app = FastAPI()
+settings = get_settings()
+app = FastAPI(title=settings.project_title)
 
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 app.include_router(pages_router)
