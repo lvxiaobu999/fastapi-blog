@@ -1,0 +1,4 @@
+interface:
+  display_name: "FastAPI 博客开发"
+  short_description: "规范开发、调试和维护当前 FastAPI 博客后端项目"
+  default_prompt: "使用 $fastapi-blog-development 实现并验证当前 FastAPI 博客项目中的功能。"

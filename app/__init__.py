@@ -1,0 +1,1 @@
+"""FastAPI blog application package."""
