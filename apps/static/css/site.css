@@ -143,6 +143,70 @@ body {
     line-height: 1.55;
 }
 
+.back-link {
+    color: var(--link-color);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.back-link:hover,
+.back-link:focus {
+    text-decoration: underline;
+}
+
+.post-detail {
+    margin-bottom: 0;
+    padding: 32px;
+}
+
+.post-detail h1 {
+    margin: 14px 0 18px;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.15;
+}
+
+.post-author {
+    color: var(--link-color);
+    font-weight: 600;
+}
+
+.post-content p {
+    font-size: 1.2rem;
+    line-height: 1.75;
+}
+
+.error-panel {
+    max-width: 720px;
+    margin: clamp(36px, 9vh, 96px) auto 0;
+    padding: clamp(32px, 7vw, 64px);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    background: var(--panel-bg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
+    text-align: center;
+}
+
+.error-code {
+    color: var(--link-color);
+    font-size: clamp(4.5rem, 15vw, 8rem);
+    font-weight: 800;
+    letter-spacing: -.06em;
+    line-height: .9;
+}
+
+.error-panel h1 {
+    margin: 20px 0 10px;
+    font-size: clamp(1.8rem, 5vw, 2.6rem);
+}
+
+.error-panel p {
+    max-width: 520px;
+    margin: 0 auto 28px;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
 .sidebar-panel {
     padding: 24px 26px;
 }
@@ -177,6 +241,10 @@ body {
     .post-card {
         gap: 16px;
         padding: 20px;
+    }
+
+    .post-detail {
+        padding: 24px 20px;
     }
 
     .author-avatar {

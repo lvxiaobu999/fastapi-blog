@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9 col-xl-8">
+        <nav class="mb-3" aria-label="Breadcrumb">
+            <a class="back-link" href="{{ url_for('home') }}">&larr; Back to all posts</a>
+        </nav>
+
+        <article class="post-card post-detail">
+            <div class="author-avatar" aria-hidden="true">
+                {{ post.author.split()[0][0] }}{{ post.author.split()[-1][0] }}
+            </div>
+            <div class="post-body">
+                <div class="post-meta">
+                    <span class="post-author">{{ post.author }}</span>
+                    <time>{{ post.date_posted }}</time>
+                </div>
+                <h1>{{ post.title }}</h1>
+                <div class="post-content">
+                    <p>{{ post.content }}</p>
+                </div>
+            </div>
+        </article>
+    </div>
+</div>
+{% endblock content %}

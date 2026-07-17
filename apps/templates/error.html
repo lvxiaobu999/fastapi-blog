@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="error-panel" aria-labelledby="error-title">
+    <div class="error-code" aria-hidden="true">{{ status_code | default(404) }}</div>
+    <h1 id="error-title">Page not found</h1>
+    <p>{{ message | default("Sorry, the page you are looking for does not exist or has been moved.") }}</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('home') }}">Return to homepage</a>
+</section>
+{% endblock content %}
