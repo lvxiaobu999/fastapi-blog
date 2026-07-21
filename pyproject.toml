@@ -5,8 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aiosqlite>=0.22.1",
     "fastapi[standard]>=0.139.1",
+    "psycopg[binary]>=3.3.4",
+    "pwdlib[argon2]>=0.3.0",
     "pydantic-settings>=2.14.2",
+    "pyjwt>=2.13.0",
+    "sqlalchemy>=2.0.51",
 ]
 
 [tool.ruff]

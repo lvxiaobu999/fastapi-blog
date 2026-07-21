@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.user import UserResponse
+
 
 class PostBase(BaseModel):
     title: str = Field(min_length=1, max_length=100)
@@ -8,7 +10,7 @@ class PostBase(BaseModel):
 
 
 class PostCreate(PostBase):
-    pass
+    user_id: int
 
 
 class PostResponse(PostBase):
@@ -16,3 +18,4 @@ class PostResponse(PostBase):
 
     id: int
     date_posted: str
+    anthor: UserResponse

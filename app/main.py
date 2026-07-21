@@ -10,6 +10,7 @@ settings = get_settings()
 app = FastAPI(title=settings.project_title)
 
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
+app.mount("media", StaticFiles(directory=APP_DIR / "media"), name="media")
 app.include_router(pages_router)
 app.include_router(api_posts_router)
 
