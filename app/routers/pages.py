@@ -1,6 +1,3 @@
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
-
-from app.templating import templates
+from fastapi import APIRouter
 
 router = APIRouter(include_in_schema=False)
