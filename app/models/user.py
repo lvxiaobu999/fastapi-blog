@@ -1,9 +1,14 @@
 import secrets
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Integer, String, false
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    # 仅用于静态类型提示，避免 User 与 Post 在运行时循环导入。
+    from app.models.post import Post
 
 
 class User(Base):
@@ -38,6 +43,14 @@ class User(Base):
         nullable=False,
         default=False,
         server_default=false(),
+    )
+
+    # 一个用户拥有多篇帖子。delete-orphan 表示帖子离开其唯一作者后不能独立存在；
+    # passive_deletes=True 让数据库根据 Post.user_id 的 ON DELETE CASCADE 完成级联删除。
+    posts: Mapped[list["Post"]] = relationship(
+        back_populates="author",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     @property
