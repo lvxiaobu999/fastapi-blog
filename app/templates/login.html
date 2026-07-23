@@ -12,7 +12,8 @@
         <div class="alert alert-danger" role="alert">{{ error }}</div>
         {% endif %}
 
-        <form method="post" action="{{ form_action | default('') }}" class="stacked-form">
+        <form class="stacked-form" data-login-form>
+            <div class="alert d-none" role="alert" data-form-feedback></div>
             <div>
                 <label class="form-label" for="username">用户名</label>
                 <input class="form-control form-control-lg" id="username" name="username"

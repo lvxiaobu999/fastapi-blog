@@ -19,7 +19,9 @@
         </div>
         {% endif %}
 
-        <form method="post" action="{{ form_action | default('') }}" class="stacked-form">
+        <form class="stacked-form" data-post-form
+              {% if post | default(none) %}data-post-id="{{ post.id }}"{% endif %}>
+            <div class="alert alert-danger d-none" role="alert" data-form-feedback></div>
             <div>
                 <label class="form-label" for="title">标题</label>
                 <input class="form-control form-control-lg" id="title" name="title" type="text"

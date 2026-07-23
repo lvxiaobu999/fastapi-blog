@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.dependencies.auth import CurrentUser
 from app.schemas import UserCreate, UserResponse, UserUpdate
 from app.services import users as user_service
 
@@ -54,10 +55,14 @@ async def get_user(user_id: int, session: DbSession):
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-async def update_user(user_id: int, data: UserUpdate, session: DbSession):
-    """部分更新用户；未传入的字段保持不变。"""
+async def update_user(
+    user_id: int, data: UserUpdate, session: DbSession, current_user: CurrentUser
+):
+    """用户本人或管理员部分更新资料；未传入的字段保持不变。"""
 
     user = await _get_user_or_404(session, user_id)
+    if current_user.id != user.id and not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
     try:
         return await user_service.update_user(session, user, data)
     except user_service.UserAlreadyExistsError as exc:
@@ -68,9 +73,11 @@ async def update_user(user_id: int, data: UserUpdate, session: DbSession):
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: int, session: DbSession) -> Response:
-    """删除用户，成功时返回没有响应体的 204。"""
+async def delete_user(user_id: int, session: DbSession, current_user: CurrentUser) -> Response:
+    """用户本人或管理员删除用户，成功时返回没有响应体的 204。"""
 
     user = await _get_user_or_404(session, user_id)
+    if current_user.id != user.id and not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
     await user_service.delete_user(session, user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

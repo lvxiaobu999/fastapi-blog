@@ -38,15 +38,17 @@ class Settings(BaseSettings):
     project_title: str = "FastAPI Blog"
     database_url: str
     # 即使 JWT 尚未启用，也强制从环境读取密钥，避免后续接入认证时误用空值或硬编码默认值。
+    # SECRET_KEY 用 SecretStr 防止配置对象 repr 或校验错误意外打印完整密钥；生产环境
+    # 必须由部署平台注入随机值，不能复用仓库或开发机密钥。
     secret_key: SecretStr
+    # HS256 使用同一个密钥签名和验证，适合当前单体应用；更换算法必须同步编码和解码端。
     algorithm: str = "HS256"
+    # Access Token 只有 30 分钟有效期；缩短会增加重新登录频率，延长会扩大泄露后的风险。
     access_token_expire_minutes: int = 30
 
     @model_validator(mode="after")
     def validate_database_for_environment(self) -> "Settings":
-        if self.env == "development" and not self.database_url.startswith(
-            "sqlite+aiosqlite://"
-        ):
+        if self.env == "development" and not self.database_url.startswith("sqlite+aiosqlite://"):
             raise ValueError("Development DATABASE_URL must use SQLite with aiosqlite")
         if self.env == "production" and not self.database_url.startswith("postgresql+psycopg://"):
             raise ValueError("Production DATABASE_URL must use PostgreSQL with psycopg")

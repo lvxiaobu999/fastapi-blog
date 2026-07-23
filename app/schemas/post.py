@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.user import UserResponse
+from app.schemas.user import UserPublic
 
 
 class PostBase(BaseModel):
@@ -16,6 +16,10 @@ class PostCreate(PostBase):
     """创建帖子时需要指定作者用户 ID。"""
 
     user_id: int
+
+
+class PostCreateRequest(PostBase):
+    """发帖 HTTP 请求；作者必须从 JWT 获取，客户端不能指定 user_id。"""
 
 
 class PostUpdate(BaseModel):
@@ -41,4 +45,4 @@ class PostResponse(PostBase):
     id: int
     created_at: datetime
     user_id: int
-    author: UserResponse
+    author: UserPublic

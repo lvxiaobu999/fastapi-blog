@@ -2,7 +2,7 @@
 {% block content %}
 <div class="row g-4">
     <section class="col-lg-8" aria-label="文章列表">
-        <form class="post-search" method="get" action="{{ url_for('posts') }}" role="search">
+        <form class="post-search" action="{{ url_for('posts') }}" role="search" data-search-form>
             <label class="visually-hidden" for="post-keyword">搜索文章</label>
             <input class="form-control" id="post-keyword" name="keyword" type="search"
                    maxlength="100" placeholder="搜索标题或正文"

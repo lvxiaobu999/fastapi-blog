@@ -1,16 +1,11 @@
 """用户数据访问与业务规则。"""
 
-from pwdlib import PasswordHash
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from anyio import to_thread
-
 from app.models import User
 from app.schemas import UserCreate, UserUpdate
-
-# recommended() 当前会选择 Argon2。PasswordHash 可以安全复用，无需每次请求重复创建。
-password_hash = PasswordHash.recommended()
+from app.services.auth import hash_password
 
 
 class UserAlreadyExistsError(Exception):
@@ -39,21 +34,23 @@ async def _ensure_unique_identity(
         raise UserAlreadyExistsError
 
 
-async def create_user(session: AsyncSession, data: UserCreate) -> User:
-    """规范化输入、哈希密码并在一个事务中创建用户。"""
+async def create_user(session: AsyncSession, data: UserCreate, *, is_admin: bool = False) -> User:
+    """规范化输入、哈希密码并创建用户；管理员标记只能由后端可信调用方传入。"""
 
     username = data.username.strip()
     email = _normalize_email(str(data.email))
     await _ensure_unique_identity(session, username=username, email=email)
 
     # Argon2 是 CPU 密集操作，放入工作线程，避免阻塞处理其他请求的事件循环。
-    hashed_password = await to_thread.run_sync(password_hash.hash, data.password)
+    hashed_password = await hash_password(data.password)
 
     user = User(
         username=username,
         email=email,
         # 数据库永远只接收 Argon2 哈希，不保存请求中的明文密码。
         hashed_password=hashed_password,
+        # 公开注册 Router 不传该参数，普通访客不能通过请求体提升自身权限。
+        is_admin=is_admin,
     )
     session.add(user)
 
@@ -108,7 +105,7 @@ async def update_user(session: AsyncSession, user: User, data: UserUpdate) -> Us
     user.username = normalized_username
     user.email = normalized_email
     if changes.get("password") is not None:
-        user.hashed_password = await to_thread.run_sync(password_hash.hash, changes["password"])
+        user.hashed_password = await hash_password(changes["password"])
     if changes.get("nickname") is not None:
         user.nickname = changes["nickname"].strip()
     if "image_file" in changes:

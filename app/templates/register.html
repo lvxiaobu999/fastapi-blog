@@ -16,7 +16,8 @@
         </div>
         {% endif %}
 
-        <form method="post" action="{{ form_action | default('') }}" class="stacked-form">
+        <form class="stacked-form" data-register-form>
+            <div class="alert d-none" role="alert" data-form-feedback></div>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label" for="username">用户名</label>

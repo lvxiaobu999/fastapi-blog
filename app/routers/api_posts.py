@@ -6,7 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.schemas.post import PostCreate, PostQueryParams, PostResponse, PostUpdate
+from app.dependencies.auth import AdminUser
+from app.schemas.post import (
+    PostCreate,
+    PostCreateRequest,
+    PostQueryParams,
+    PostResponse,
+    PostUpdate,
+)
 from app.services import posts as post_service
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
@@ -26,10 +33,17 @@ async def _get_post_or_404(session: AsyncSession, post_id: int):
 
 
 @router.post("", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
-async def create_post(data: PostCreate, session: DbSession):
-    """创建帖子并返回包含数据库生成字段的完整响应。"""
+async def create_post(data: PostCreateRequest, session: DbSession, current_user: AdminUser):
+    """由已认证管理员创建帖子；作者 ID 始终取自 JWT 对应用户。
 
-    return await post_service.create_post(session, data)
+    ``PostCreateRequest`` 故意不包含 ``user_id``。如果直接信任前端传来的作者 ID，
+    登录用户就可以冒充其他用户发帖；这里从 ``AdminUser`` 依赖得到经过 JWT 和数据库
+    校验的身份，再由服务层保存该 ID。
+    """
+
+    return await post_service.create_post(
+        session, PostCreate(**data.model_dump(), user_id=current_user.id)
+    )
 
 
 @router.get("", response_model=list[PostResponse])
@@ -50,8 +64,8 @@ async def get_post(post_id: int, session: DbSession):
 
 
 @router.patch("/{post_id}", response_model=PostResponse)
-async def update_post(post_id: int, data: PostUpdate, session: DbSession):
-    """部分更新用户；未传入的字段保持不变。"""
+async def update_post(post_id: int, data: PostUpdate, session: DbSession, _current_user: AdminUser):
+    """由已认证管理员部分更新帖子；未传入的字段保持不变。"""
 
     post = await _get_post_or_404(session, post_id)
 
@@ -59,7 +73,9 @@ async def update_post(post_id: int, data: PostUpdate, session: DbSession):
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_post(post_id: int, session: DbSession) -> Response:
+async def delete_post(post_id: int, session: DbSession, _current_user: AdminUser) -> Response:
+    """由已认证管理员删除帖子。"""
+
     post = await _get_post_or_404(session, post_id)
     await post_service.delete_post(session, post)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

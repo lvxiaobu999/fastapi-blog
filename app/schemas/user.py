@@ -32,13 +32,24 @@ class UserUpdate(BaseModel):
     image_file: str | None = Field(default=None, max_length=200)
 
 
-class UserResponse(UserBase):
-    """允许通过 API 返回的用户公开信息。"""
-
-    model_config = ConfigDict(from_attributes=True)
+class UserPublic(BaseModel):
+    """用户可公开的数据"""
 
     id: int
+    username: str = Field(min_length=1, max_length=50)
     nickname: str
     image_file: str | None
     image_path: str
     is_admin: bool
+
+
+class UserPrivate(UserPublic):
+    """用户隐私数据"""
+
+    email: EmailStr = Field(max_length=254)
+
+
+class UserResponse(UserPrivate):
+    """允许通过 API 返回的用户公开信息。"""
+
+    model_config = ConfigDict(from_attributes=True)

@@ -54,3 +54,14 @@ async def test_page_router_returns_html_404(client: AsyncClient) -> None:
 
     assert response.status_code == 404
     assert "Page not found" in response.text
+
+
+async def test_layout_uses_auth_modals_and_es_modules(client: AsyncClient) -> None:
+    """导航登录注册只打开模态框，前端写操作由 ES module 接管。"""
+
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert 'data-bs-target="#loginModal"' in response.text
+    assert 'data-bs-target="#registerModal"' in response.text
+    assert 'type="module"' in response.text
+    assert "/static/js/auth.js" in response.text

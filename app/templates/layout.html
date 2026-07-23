@@ -39,8 +39,12 @@
                     </li>
                 </ul>
                 <div class="navbar-actions">
-                    <a class="btn btn-outline-light" href="{{ url_for('login') }}">Login</a>
-                    <a class="btn btn-light" href="{{ url_for('register') }}">Register</a>
+                    <button class="btn btn-outline-light" type="button" data-auth-guest
+                            data-bs-toggle="modal" data-bs-target="#loginModal">Login</button>
+                    <button class="btn btn-light" type="button" data-auth-guest
+                            data-bs-toggle="modal" data-bs-target="#registerModal">Register</button>
+                    <a class="btn btn-light d-none" href="{{ url_for('post_create') }}" data-auth-user>发布帖子</a>
+                    <button class="btn btn-outline-light d-none" type="button" data-auth-user data-logout>退出</button>
                     <div class="dropdown">
                         <button class="btn theme-toggle dropdown-toggle" type="button"
                                 data-bs-toggle="dropdown" aria-expanded="false"
@@ -64,8 +68,45 @@
         {% endblock content %}
     </main>
 
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <div class="modal-header"><h2 class="modal-title fs-5" id="loginModalTitle">登录博客</h2>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+            <form class="modal-body stacked-form" data-login-form>
+                <div class="alert d-none" role="alert" data-form-feedback></div>
+                <div><label class="form-label" for="modal-login-username">用户名</label>
+                    <input class="form-control" id="modal-login-username" name="username" autocomplete="username" required></div>
+                <div><label class="form-label" for="modal-login-password">密码</label>
+                    <input class="form-control" id="modal-login-password" name="password" type="password" autocomplete="current-password" required></div>
+                <button class="btn btn-primary" type="submit">登录</button>
+            </form>
+        </div></div>
+    </div>
+
+    <div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <div class="modal-header"><h2 class="modal-title fs-5" id="registerModalTitle">创建账号</h2>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+            <form class="modal-body stacked-form" data-register-form>
+                <div class="alert d-none" role="alert" data-form-feedback></div>
+                <div><label class="form-label" for="modal-register-username">用户名</label>
+                    <input class="form-control" id="modal-register-username" name="username" maxlength="50" required></div>
+                <div><label class="form-label" for="modal-register-email">邮箱</label>
+                    <input class="form-control" id="modal-register-email" name="email" type="email" maxlength="254" required></div>
+                <div><label class="form-label" for="modal-register-password">密码</label>
+                    <input class="form-control" id="modal-register-password" name="password" type="password" minlength="8" maxlength="128" required></div>
+                <div><label class="form-label" for="modal-register-confirm">确认密码</label>
+                    <input class="form-control" id="modal-register-confirm" name="password_confirm" type="password" minlength="8" maxlength="128" required></div>
+                <button class="btn btn-primary" type="submit">注册账号</button>
+            </form>
+        </div></div>
+    </div>
+
     <script src="{{ url_for('static', path='js/jquery-4.0.0.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/theme.js') }}"></script>
+    <script type="module" src="{{ url_for('static', path='js/auth.js') }}"></script>
+    <script type="module" src="{{ url_for('static', path='js/posts.js') }}"></script>
+    <script type="module" src="{{ url_for('static', path='js/forms.js') }}"></script>
 </body>
 </html>
