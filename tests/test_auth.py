@@ -97,3 +97,49 @@ async def test_expired_and_forged_tokens_return_401(client: AsyncClient) -> None
         )
         assert response.status_code == 401
         assert response.headers["www-authenticate"] == "Bearer"
+
+
+async def test_admin_can_upload_valid_post_image(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """图片接口校验管理员身份和文件签名，并返回公开 URL。"""
+
+    from app.services import images as image_service
+
+    user = await register(client)
+    async with session_factory() as session:
+        stored_user = await session.get(User, user["id"])
+        assert stored_user is not None
+        stored_user.is_admin = True
+        await session.commit()
+    token = (await login(client)).json()["access_token"]
+    target_dir = tmp_path / "post_images"
+    monkeypatch.setattr(image_service, "POST_IMAGE_DIR", target_dir)
+
+    response = await client.post(
+        "/api/posts/images",
+        files={"image": ("example.png", b"\x89PNG\r\n\x1a\nimage-data", "image/png")},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["url"].startswith("/media/post_images/")
+    assert len(list(target_dir.glob("*.png"))) == 1
+
+
+async def test_post_image_rejects_regular_user_and_fake_image(client: AsyncClient) -> None:
+    """普通用户不能上传，管理员上传伪造图片时返回 400。"""
+
+    user = await register(client)
+    token = (await login(client)).json()["access_token"]
+    regular = await client.post(
+        "/api/posts/images",
+        files={"image": ("fake.png", b"not-an-image", "image/png")},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert user["is_admin"] is False
+    assert regular.status_code == 403

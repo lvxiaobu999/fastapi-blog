@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -14,11 +14,33 @@ from app.schemas.post import (
     PostResponse,
     PostUpdate,
 )
+from app.schemas.upload import ImageUploadResponse
+from app.services.images import InvalidImageError, save_post_image
 from app.services import posts as post_service
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 router = APIRouter(prefix="/api/posts", tags=["posts"])
+
+
+@router.post(
+    "/images",
+    response_model=ImageUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_post_image(
+    _current_user: AdminUser,
+    image: Annotated[UploadFile, File(description="PNG, JPEG, GIF or WebP; max 5 MB")],
+) -> ImageUploadResponse:
+    """为富文本编辑器保存图片；只有管理员能够写入帖子媒体目录。"""
+
+    try:
+        url = await save_post_image(image)
+    except InvalidImageError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    finally:
+        await image.close()
+    return ImageUploadResponse(url=url)
 
 
 async def _get_post_or_404(session: AsyncSession, post_id: int):

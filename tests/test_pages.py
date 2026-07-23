@@ -65,3 +65,19 @@ async def test_layout_uses_auth_modals_and_es_modules(client: AsyncClient) -> No
     assert 'data-bs-target="#registerModal"' in response.text
     assert 'type="module"' in response.text
     assert "/static/js/auth.js" in response.text
+
+
+async def test_post_pages_include_rich_editor_and_markdown_viewer(
+    client: AsyncClient, seeded_ids: tuple[int, int]
+) -> None:
+    """编辑页加载 Toast UI，详情页通过 Viewer 渲染 Markdown。"""
+
+    _, post_id = seeded_ids
+    editor = await client.get("/posts/new")
+    viewer = await client.get(f"/posts/{post_id}")
+
+    assert "toastui-editor-all.min.js" in editor.text
+    assert 'id="post-editor"' in editor.text
+    assert "toastui-editor-all.min.js" in viewer.text
+    assert 'id="post-viewer"' in viewer.text
+    assert "/static/js/posts.js" in viewer.text
