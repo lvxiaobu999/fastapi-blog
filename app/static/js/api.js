@@ -3,15 +3,15 @@
 const TOKEN_KEY = "blog-access-token";
 
 export function getToken() {
-    return sessionStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(TOKEN_KEY);
 }
 
 export function saveToken(token) {
-    sessionStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function clearToken() {
-    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
 }
 
 export function ajaxRequest({url, method = "GET", data, formEncoded = false, auth = false}) {

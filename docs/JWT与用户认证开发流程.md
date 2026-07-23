@@ -62,7 +62,7 @@ flowchart TD
     D --> F[Argon2 校验密码]
     F -->|成功| G[auth.py create_access_token]
     G --> H[返回 access_token]
-    H --> I[auth.js 保存到 sessionStorage]
+    H --> I[auth.js 保存到 localStorage]
 
     J[post_form.html 发布表单] -->|submit| K[posts.js]
     K --> L[api.js 添加 Authorization: Bearer]
@@ -86,7 +86,7 @@ flowchart TD
 6. `api.js` 统一封装 AJAX；具体表单模块只负责收集字段、展示错误和页面跳转。
 7. `tests/test_auth.py` 验证正确登录、错误凭据、过期/伪造 Token、普通用户 403 和管理员成功。
 
-`sessionStorage` 会在当前标签页关闭后清除，比永久保存更收敛，但仍可被同源 JavaScript 读取，因此生产环境还必须严格防范 XSS 并启用 HTTPS。
+`localStorage` 会在当前标签页关闭后清除，比永久保存更收敛，但仍可被同源 JavaScript 读取，因此生产环境还必须严格防范 XSS 并启用 HTTPS。
 
 第一阶段不需要修改用户表，也不需要新增数据库迁移。只有未来增加 Refresh Token、Token 版本、账号禁用或登录审计字段时，才需要新迁移。
 

@@ -111,7 +111,7 @@ return TokenResponse(access_token=auth_service.create_access_token(user.id))
 
 ### 2. Token 验证
 
-登录成功后，前端会把 Token 放到当前标签页的 `sessionStorage`，发帖 AJAX 会发送：
+登录成功后，前端会把 Token 放到当前标签页的 `localStorage`，发帖 AJAX 会发送：
 
 ```http
 Authorization: Bearer <access_token>
@@ -218,7 +218,7 @@ user.is_admin == False
 
 如果登录成功但发帖返回 401，优先检查：
 
-- `sessionStorage` 是否存在 `blog-access-token`。
+- `localStorage` 是否存在 `blog-access-token`。
 - `api.js` 是否使用 `auth: true`。
 - 浏览器请求是否真的发送 Authorization Header。
 - Token 是否已经过期。
