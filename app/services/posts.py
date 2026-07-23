@@ -4,7 +4,8 @@
 """
 
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.post import Post
 from app.models.user import User
@@ -15,10 +16,10 @@ class PostAuthorNotFoundError(Exception):
     """创建帖子时指定的作者用户不存在。"""
 
 
-def create_post(session: Session, data: PostCreate) -> Post:
+async def create_post(session: AsyncSession, data: PostCreate) -> Post:
     """验证作者、创建帖子并提交事务。"""
 
-    author = session.get(User, data.user_id)
+    author = await session.get(User, data.user_id)
     if author is None:
         raise PostAuthorNotFoundError
 
@@ -29,13 +30,13 @@ def create_post(session: Session, data: PostCreate) -> Post:
         author=author,
     )
     session.add(post)
-    session.commit()
-    session.refresh(post)
+    await session.commit()
+    await session.refresh(post)
 
     return post
 
 
-def update_post(session: Session, post: Post, data: PostUpdate) -> Post:
+async def update_post(session: AsyncSession, post: Post, data: PostUpdate) -> Post:
     """只更新请求中实际提供的标题或正文，并返回更新后的帖子。"""
 
     changes = data.model_dump(exclude_unset=True)
@@ -48,16 +49,16 @@ def update_post(session: Session, post: Post, data: PostUpdate) -> Post:
     for field, value in changes.items():
         setattr(post, field, value)
 
-    session.commit()
-    session.refresh(post)
+    await session.commit()
+    await session.refresh(post)
     return post
 
 
-def get_post(session: Session, post_id: int) -> Post | None:
+async def get_post(session: AsyncSession, post_id: int) -> Post | None:
     """按主键查询一篇帖子，并预加载作者；不存在时返回 None。"""
 
     statement = select(Post).options(selectinload(Post.author)).where(Post.id == post_id)
-    return session.scalar(statement)
+    return await session.scalar(statement)
 
 
 def _escape_like_keyword(keyword: str) -> str:
@@ -66,7 +67,7 @@ def _escape_like_keyword(keyword: str) -> str:
     return keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def list_posts(session: Session, params: PostQueryParams) -> list[Post]:
+async def list_posts(session: AsyncSession, params: PostQueryParams) -> list[Post]:
     """分页查询帖子，并按关键词模糊匹配标题或正文。"""
 
     statement = select(Post).options(selectinload(Post.author))
@@ -88,9 +89,12 @@ def list_posts(session: Session, params: PostQueryParams) -> list[Post]:
         .offset(params.offset)
         .limit(params.limit)
     )
-    return list(session.scalars(statement))
+    result = await session.scalars(statement)
+    return list(result)
 
 
-def delete_post(session: Session, post: Post) -> None:
-    session.delete(post)
-    session.commit()
+async def delete_post(session: AsyncSession, post: Post) -> None:
+    """异步删除帖子并提交事务。"""
+
+    await session.delete(post)
+    await session.commit()

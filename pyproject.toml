@@ -6,7 +6,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    # SQLite 异步驱动，预留给异步数据库访问；当前同步 Session 使用 SQLAlchemy 自带驱动。
+    # SQLite 异步驱动，供 SQLAlchemy AsyncEngine 和 AsyncSession 使用。
     "aiosqlite>=0.22.1",
     # 数据库版本迁移工具，负责创建和演进表结构。
     "alembic>=1.18.5",

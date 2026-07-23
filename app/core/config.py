@@ -44,12 +44,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_database_for_environment(self) -> "Settings":
-        if self.env == "development" and not self.database_url.startswith("sqlite:"):
-            raise ValueError("Development DATABASE_URL must use SQLite")
-        if self.env == "production" and not self.database_url.startswith(
-            ("postgresql://", "postgresql+psycopg://")
+        if self.env == "development" and not self.database_url.startswith(
+            "sqlite+aiosqlite://"
         ):
-            raise ValueError("Production DATABASE_URL must use PostgreSQL")
+            raise ValueError("Development DATABASE_URL must use SQLite with aiosqlite")
+        if self.env == "production" and not self.database_url.startswith("postgresql+psycopg://"):
+            raise ValueError("Production DATABASE_URL must use PostgreSQL with psycopg")
         return self
 
 
