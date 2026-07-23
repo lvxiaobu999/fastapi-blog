@@ -408,8 +408,70 @@ body {
 
 .post-editor {
     min-height: 360px;
-    resize: vertical;
-    line-height: 1.65;
+}
+
+.post-editor .toastui-editor-defaultUI {
+    border-color: var(--panel-border);
+    border-radius: 6px;
+}
+
+.post-content .toastui-editor-contents {
+    color: var(--text-main);
+    font-size: 1.05rem;
+}
+
+.post-content .toastui-editor-contents img {
+    max-width: 100%;
+    height: auto;
+}
+
+.post-content .toastui-editor-contents pre {
+    overflow-x: auto;
+}
+
+/* 代码块使用独立的深色阅读区域；语言名称由 posts.js 从 Markdown 的代码 class 推导。 */
+.toastui-editor-contents pre.rich-code-block,
+.toastui-editor-contents pre {
+    position: relative;
+    margin: 1.25rem 0;
+    padding: 42px 18px 18px;
+    overflow-x: auto;
+    border: 1px solid #303942;
+    border-radius: 8px;
+    color: #e6edf3;
+    background: #161b22;
+}
+
+.toastui-editor-contents pre.rich-code-block::before,
+.toastui-editor-contents pre::before {
+    position: absolute;
+    inset: 0 0 auto;
+    display: block;
+    height: 30px;
+    padding: 7px 14px;
+    border-bottom: 1px solid #303942;
+    color: #8b949e;
+    background: #21262d;
+    content: attr(data-language);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+}
+
+.toastui-editor-contents pre code {
+    color: inherit;
+    background: transparent;
+}
+
+.toastui-editor-contents pre code.language-javascript,
+.toastui-editor-contents pre code.lang-javascript {
+    color: #f0db4f;
+}
+
+.post-viewer-fallback {
+    white-space: pre-wrap;
+    font-family: var(--bs-font-monospace);
 }
 
 .editor-actions {

@@ -1,4 +1,8 @@
 {% extends "layout.html" %}
+{% block head %}
+<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
+<link rel="stylesheet" href="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight.min.css">
+{% endblock head %}
 {% block content %}
 <div class="editor-shell">
     <section class="editor-panel" aria-labelledby="editor-title">
@@ -31,8 +35,8 @@
             </div>
             <div>
                 <label class="form-label" for="content">正文</label>
-                <textarea class="form-control post-editor" id="content" name="content"
-                          minlength="1" required>{{ post.content | default('') if post | default(none) else '' }}</textarea>
+                <div id="post-editor" class="post-editor"></div>
+                <textarea class="d-none" id="content" name="content">{{ post.content | default('') if post | default(none) else '' }}</textarea>
             </div>
             <div class="form-actions editor-actions">
                 <a class="btn btn-outline-secondary" href="{{ url_for('home') }}">取消</a>
@@ -44,3 +48,7 @@
     </section>
 </div>
 {% endblock content %}
+{% block scripts %}
+<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+<script src="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight-all.min.js"></script>
+{% endblock scripts %}

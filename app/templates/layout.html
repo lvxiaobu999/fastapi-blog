@@ -22,6 +22,7 @@
     </script>
     <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
+    {% block head %}{% endblock head %}
 </head>
 <body>
     <nav class="navbar navbar-expand-md blog-navbar" aria-label="主导航">
@@ -108,5 +109,6 @@
     <script type="module" src="{{ url_for('static', path='js/auth.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/posts.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/forms.js') }}"></script>
+    {% block scripts %}{% endblock scripts %}
 </body>
 </html>

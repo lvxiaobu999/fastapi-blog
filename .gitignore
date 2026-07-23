@@ -16,5 +16,12 @@ wheels/
 *.db
 *.db-*
 
+# Runtime user uploads (post images and profile pictures); keep directory placeholders only
+app/media/**
+!app/media/
+!app/media/**/
+!app/media/.gitkeep
+!app/media/**/.gitkeep
+
 # 个人学习示例文档，不进入项目版本控制
 /docs_example/

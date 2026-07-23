@@ -1,4 +1,8 @@
 {% extends "layout.html" %}
+{% block head %}
+<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
+<link rel="stylesheet" href="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight.min.css">
+{% endblock head %}
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-9 col-xl-8">
@@ -16,11 +20,14 @@
                     <time datetime="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime("%Y-%m-%d %H:%M") }}</time>
                 </div>
                 <h1>{{ post.title }}</h1>
-                <div class="post-content">
-                    <p>{{ post.content }}</p>
-                </div>
+                <div class="post-content" id="post-viewer"></div>
+                <textarea class="d-none" id="post-markdown">{{ post.content }}</textarea>
             </div>
         </article>
     </div>
 </div>
 {% endblock content %}
+{% block scripts %}
+<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+<script src="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight-all.min.js"></script>
+{% endblock scripts %}

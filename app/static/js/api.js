@@ -30,6 +30,24 @@ export function ajaxRequest({url, method = "GET", data, formEncoded = false, aut
     });
 }
 
+export function uploadFile(url, fieldName, file) {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+    const headers = {};
+    if (getToken()) {
+        headers.Authorization = `Bearer ${getToken()}`;
+    }
+    return $.ajax({
+        url,
+        method: "POST",
+        headers,
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: "json",
+    });
+}
+
 export function errorMessages(xhr) {
     const detail = xhr.responseJSON?.detail;
     if (Array.isArray(detail)) {
