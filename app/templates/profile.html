@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row g-4">
+    <aside class="col-lg-4">
+        <section class="profile-summary" aria-labelledby="profile-name">
+            <div class="profile-avatar" aria-hidden="true">
+                {% if user.image_file %}
+                <img src="{{ user.image_path }}" alt="">
+                {% else %}
+                {{ user.username[0] | upper }}
+                {% endif %}
+            </div>
+            <span class="role-badge">{{ "管理员" if user.is_admin else "普通用户" }}</span>
+            <h1 id="profile-name">{{ user.nickname }}</h1>
+            <p>@{{ user.username }}</p>
+            <p class="profile-email">{{ user.email }}</p>
+        </section>
+    </aside>
+
+    <section class="col-lg-8" aria-labelledby="settings-title">
+        <div class="settings-panel">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Account settings</span>
+                    <h2 id="settings-title">个人资料</h2>
+                </div>
+                <span class="text-muted">用户 ID：{{ user.id }}</span>
+            </div>
+
+            {% if message | default(none) %}
+            <div class="alert alert-success" role="status">{{ message }}</div>
+            {% endif %}
+
+            <form method="post" action="{{ form_action | default('') }}"
+                  enctype="multipart/form-data" class="stacked-form">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="nickname">昵称</label>
+                        <input class="form-control" id="nickname" name="nickname" type="text"
+                               maxlength="50" required value="{{ user.nickname }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="username">用户名</label>
+                        <input class="form-control" id="username" name="username" type="text"
+                               maxlength="50" required value="{{ user.username }}">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="email">邮箱</label>
+                        <input class="form-control" id="email" name="email" type="email"
+                               maxlength="254" required value="{{ user.email }}">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="avatar">更换头像</label>
+                        <input class="form-control" id="avatar" name="avatar" type="file"
+                               accept="image/png,image/jpeg,image/webp">
+                        <div class="form-text">支持 PNG、JPEG、WebP；文件大小限制由后端校验。</div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" type="submit">保存修改</button>
+                    <button class="btn btn-outline-secondary" type="reset">撤销输入</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+{% endblock content %}

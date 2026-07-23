@@ -2,21 +2,39 @@
 {% block content %}
 <div class="row g-4">
     <section class="col-lg-8" aria-label="文章列表">
+        <form class="post-search" method="get" action="{{ url_for('posts') }}" role="search">
+            <label class="visually-hidden" for="post-keyword">搜索文章</label>
+            <input class="form-control" id="post-keyword" name="keyword" type="search"
+                   maxlength="100" placeholder="搜索标题或正文"
+                   value="{{ query.keyword | default('') if query.keyword else '' }}">
+            <button class="btn btn-primary" type="submit">搜索</button>
+            {% if query.keyword %}
+            <a class="btn btn-outline-secondary" href="{{ url_for('posts') }}">清除</a>
+            {% endif %}
+        </form>
+
+        {% if posts %}
         {% for post in posts %}
         <article class="post-card">
             <div class="author-avatar" aria-hidden="true">
-                {{ post.author.split()[0][0] }}{{ post.author.split()[-1][0] }}
+                {{ post.author.username[0] | upper }}
             </div>
             <div class="post-body">
                 <div class="post-meta">
-                    <a href="#">{{ post.author }}</a>
-                    <time>{{ post.date_posted }}</time>
+                    <a href="#">{{ post.author.nickname }}</a>
+                    <time datetime="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime("%Y-%m-%d") }}</time>
                 </div>
                 <h2><a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a></h2>
                 <p>{{ post.content }}</p>
             </div>
         </article>
         {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <h2>没有找到文章</h2>
+            <p>尝试使用其他关键词，或清除搜索条件。</p>
+        </div>
+        {% endif %}
     </section>
 
     <aside class="col-lg-4">

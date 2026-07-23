@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="auth-shell">
+    <section class="auth-card auth-card-wide" aria-labelledby="register-title">
+        <div class="auth-card-header">
+            <span class="eyebrow">Join the community</span>
+            <h1 id="register-title">创建账号</h1>
+            <p>注册后可以维护个人资料并关注博客的最新内容。</p>
+        </div>
+
+        {% if errors | default(none) %}
+        <div class="alert alert-danger" role="alert">
+            <ul class="mb-0">
+                {% for item in errors %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form method="post" action="{{ form_action | default('') }}" class="stacked-form">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="username">用户名</label>
+                    <input class="form-control" id="username" name="username" type="text"
+                           minlength="1" maxlength="50" autocomplete="username" required
+                           value="{{ form.username | default('') if form | default(none) else '' }}">
+                    <div class="form-text">最长 50 个字符，注册后用于登录。</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="email">邮箱</label>
+                    <input class="form-control" id="email" name="email" type="email"
+                           maxlength="254" autocomplete="email" required
+                           value="{{ form.email | default('') if form | default(none) else '' }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="password">密码</label>
+                    <input class="form-control" id="password" name="password" type="password"
+                           minlength="8" maxlength="128" autocomplete="new-password" required>
+                    <div class="form-text">至少 8 个字符。</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="password-confirm">确认密码</label>
+                    <input class="form-control" id="password-confirm" name="password_confirm"
+                           type="password" minlength="8" maxlength="128"
+                           autocomplete="new-password" required>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-lg w-100" type="submit">注册账号</button>
+        </form>
+
+        <p class="auth-switch">已经有账号？ <a href="{{ url_for('login') }}">直接登录</a></p>
+    </section>
+</div>
+{% endblock content %}

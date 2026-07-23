@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="editor-shell">
+    <section class="editor-panel" aria-labelledby="editor-title">
+        <div class="section-heading editor-heading">
+            <div>
+                <span class="eyebrow">{{ "Edit story" if post | default(none) else "New story" }}</span>
+                <h1 id="editor-title">{{ "编辑文章" if post | default(none) else "发布新文章" }}</h1>
+                <p>{{ "修改完成后保存文章内容。" if post | default(none) else "写下值得分享的内容，发布后读者即可看到。" }}</p>
+            </div>
+            {% if post | default(none) %}<span class="status-pill">文章 #{{ post.id }}</span>{% endif %}
+        </div>
+
+        {% if errors | default(none) %}
+        <div class="alert alert-danger" role="alert">
+            <ul class="mb-0">
+                {% for item in errors %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form method="post" action="{{ form_action | default('') }}" class="stacked-form">
+            <div>
+                <label class="form-label" for="title">标题</label>
+                <input class="form-control form-control-lg" id="title" name="title" type="text"
+                       minlength="1" maxlength="100" required autofocus
+                       value="{{ post.title | default('') if post | default(none) else '' }}">
+                <div class="form-text">1～100 个字符。</div>
+            </div>
+            <div>
+                <label class="form-label" for="content">正文</label>
+                <textarea class="form-control post-editor" id="content" name="content"
+                          minlength="1" required>{{ post.content | default('') if post | default(none) else '' }}</textarea>
+            </div>
+            <div class="form-actions editor-actions">
+                <a class="btn btn-outline-secondary" href="{{ url_for('home') }}">取消</a>
+                <button class="btn btn-primary px-4" type="submit">
+                    {{ "保存修改" if post | default(none) else "发布文章" }}
+                </button>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock content %}
