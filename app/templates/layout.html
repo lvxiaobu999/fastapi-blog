@@ -27,7 +27,10 @@
 <body>
     <nav class="navbar navbar-expand-md blog-navbar" aria-label="主导航">
         <div class="container-xl">
-            <a class="navbar-brand" href="{{ url_for('home') }}">FastAPI Blog</a>
+            <a class="navbar-brand" href="{{ url_for('home') }}">
+                <span class="brand-mark" aria-hidden="true">F</span>
+                <span>FastAPI Blog</span>
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                     data-bs-target="#mainNavbar" aria-controls="mainNavbar"
                     aria-expanded="false" aria-label="展开导航">
@@ -36,14 +39,14 @@
             <div class="collapse navbar-collapse" id="mainNavbar">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="{{ url_for('home') }}">Home</a>
+                        <a class="nav-link active" aria-current="page" href="{{ url_for('home') }}">文章</a>
                     </li>
                 </ul>
                 <div class="navbar-actions">
                     <button class="btn btn-outline-light" type="button" data-auth-guest
-                            data-bs-toggle="modal" data-bs-target="#loginModal">Login</button>
+                            data-bs-toggle="modal" data-bs-target="#loginModal">登录</button>
                     <button class="btn btn-light" type="button" data-auth-guest
-                            data-bs-toggle="modal" data-bs-target="#registerModal">Register</button>
+                            data-bs-toggle="modal" data-bs-target="#registerModal">注册</button>
                     <a class="btn btn-light d-none" href="{{ url_for('post_create') }}" data-auth-user>发布帖子</a>
                     <button class="btn btn-outline-light d-none" type="button" data-auth-user data-logout>退出</button>
                     <div class="dropdown">
@@ -68,6 +71,13 @@
         {% block content %}
         {% endblock content %}
     </main>
+
+    <footer class="site-footer">
+        <div class="container-xl">
+            <span>FastAPI Blog</span>
+            <span>记录技术，也记录思考。</span>
+        </div>
+    </footer>
 
     <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered"><div class="modal-content">

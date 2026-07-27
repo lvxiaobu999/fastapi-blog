@@ -2,6 +2,13 @@
 {% block content %}
 <div class="row g-4">
     <section class="col-lg-8" aria-label="文章列表">
+        <header class="page-heading">
+            <div>
+                <span class="eyebrow">ARTICLES</span>
+                <h1>最新文章</h1>
+            </div>
+            <p>分享开发实践、学习笔记与值得记录的想法。</p>
+        </header>
         <form class="post-search" action="{{ url_for('posts') }}" role="search" data-search-form>
             <label class="visually-hidden" for="post-keyword">搜索文章</label>
             <input class="form-control" id="post-keyword" name="keyword" type="search"
@@ -25,7 +32,8 @@
                     <time datetime="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime("%Y-%m-%d") }}</time>
                 </div>
                 <h2><a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a></h2>
-                <p>{{ post.content }}</p>
+                <p class="post-excerpt">{{ post.content | striptags | truncate(180, true, '…') }}</p>
+                <a class="post-read-more" href="{{ url_for('post', post_id=post.id) }}">阅读全文 <span aria-hidden="true">→</span></a>
             </div>
         </article>
         {% endfor %}
@@ -38,15 +46,15 @@
     </section>
 
     <aside class="col-lg-4">
-        <div class="sidebar-panel">
-            <h2>Our Sidebar</h2>
-            <p>You can put any information here you'd like.</p>
-            <div class="list-group">
-                <a href="#" class="list-group-item list-group-item-action">Latest Posts</a>
-                <a href="#" class="list-group-item list-group-item-action">Announcements</a>
-                <a href="#" class="list-group-item list-group-item-action">Calendars</a>
-                <a href="#" class="list-group-item list-group-item-action">etc</a>
+        <div class="sidebar-panel sidebar-sticky">
+            <span class="eyebrow">ABOUT</span>
+            <h2>关于本站</h2>
+            <p>一个基于 FastAPI 构建的个人博客，用清晰的代码记录真实的学习过程。</p>
+            <div class="sidebar-note">
+                <strong>持续更新</strong>
+                <span>Python · FastAPI · Web 开发</span>
             </div>
+            <a class="sidebar-link" href="{{ url_for('posts') }}">浏览全部文章 <span aria-hidden="true">→</span></a>
         </div>
     </aside>
 </div>
