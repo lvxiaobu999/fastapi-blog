@@ -35,7 +35,7 @@ async def create_user(
 
     try:
         user = await user_service.create_user(session, data)
-        return success_response(request, user)
+        return success_response(request, UserResponse.model_validate(user))
     except user_service.UserAlreadyExistsError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -53,7 +53,8 @@ async def list_users(
     """分页获取用户列表，单次最多返回 100 条。"""
 
     users = await user_service.list_users(session, offset=offset, limit=limit)
-    return success_response(request, users)
+    data = [UserResponse.model_validate(user) for user in users]
+    return success_response(request, data)
 
 
 @router.get("/{user_id}", response_model=ApiSuccess[UserResponse])
@@ -61,7 +62,7 @@ async def get_user(request: Request, user_id: int, session: DbSession) -> ApiSuc
     """获取单个用户的公开信息。"""
 
     user = await _get_user_or_404(session, user_id)
-    return success_response(request, user)
+    return success_response(request, UserResponse.model_validate(user))
 
 
 @router.patch("/{user_id}", response_model=ApiSuccess[UserResponse])
@@ -79,7 +80,7 @@ async def update_user(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
     try:
         updated = await user_service.update_user(session, user, data)
-        return success_response(request, updated)
+        return success_response(request, UserResponse.model_validate(updated))
     except user_service.UserAlreadyExistsError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

@@ -74,7 +74,9 @@ async def create_post(
     post = await post_service.create_post(
         session, PostCreate(**data.model_dump(), user_id=current_user.id)
     )
-    return success_response(request, post)
+    # Service 返回 SQLAlchemy Post；Router 在公开响应边界转换为 PostResponse，既过滤
+    # ORM 内部字段，也让 ApiSuccess 的泛型参数与声明的返回类型完全一致。
+    return success_response(request, PostResponse.model_validate(post))
 
 
 @router.get("", response_model=ApiSuccess[list[PostResponse]])
@@ -86,7 +88,8 @@ async def list_posts(
     """分页获取帖子列表，并按关键词模糊搜索标题和正文。"""
 
     posts = await post_service.list_posts(session, params)
-    return success_response(request, posts)
+    data = [PostResponse.model_validate(post) for post in posts]
+    return success_response(request, data)
 
 
 @router.get("/{post_id}", response_model=ApiSuccess[PostResponse])
@@ -94,7 +97,7 @@ async def get_post(request: Request, post_id: int, session: DbSession) -> ApiSuc
     """获取单个用户的公开信息。"""
 
     post = await _get_post_or_404(session, post_id)
-    return success_response(request, post)
+    return success_response(request, PostResponse.model_validate(post))
 
 
 @router.patch("/{post_id}", response_model=ApiSuccess[PostResponse])
@@ -110,7 +113,7 @@ async def update_post(
     post = await _get_post_or_404(session, post_id)
 
     updated = await post_service.update_post(session, post, data)
-    return success_response(request, updated)
+    return success_response(request, PostResponse.model_validate(updated))
 
 
 @router.delete(

@@ -35,6 +35,10 @@ class UserUpdate(BaseModel):
 class UserPublic(BaseModel):
     """用户可公开的数据"""
 
+    # UserPublic 也会作为 PostResponse.author 的嵌套 Schema 直接接收 User ORM，
+    # 因此必须在这一层启用属性读取，不能只配置最外层的 UserResponse。
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     username: str = Field(min_length=1, max_length=50)
     nickname: str
