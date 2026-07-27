@@ -45,9 +45,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     # Access Token 只有 30 分钟有效期；缩短会增加重新登录频率，延长会扩大泄露后的风险。
     access_token_expire_minutes: int = Field(default=30, ge=1)
-    # Refresh Session 的最长寿命；即使用户持续操作，也不会超过这个绝对上限。
+    # Refresh Session 的最长寿命；即使用户持续操作，也不会超过这个绝对上限。一般设置一个月 = 30 * 24 * 60
     refresh_token_expire_minutes: int = Field(default=7 * 24 * 60, ge=1)
-    # 连续无请求超过该时间后，Refresh Token 不能再换取新的 Access Token。
+    # 连续无请求超过该时间后，Refresh Token 不能再换取新的 Access Token。一般设置7天 = 7 * 24 * 60
     refresh_idle_timeout_minutes: int = Field(default=30, ge=1)
     # 本地 HTTP 调试设为 False；生产 HTTPS 必须设为 True，防止 Cookie 明文传输。
     auth_cookie_secure: bool = False
