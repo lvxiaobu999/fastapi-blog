@@ -2,6 +2,11 @@
 
 const TOKEN_KEY = "blog-access-token";
 
+function responseData(result) {
+    // 公共层统一拆掉成功响应信封，让业务脚本继续只关注 data 中的 Token、帖子或用户。
+    return result?.success === true ? result.data : result;
+}
+
 export function getToken() {
     return localStorage.getItem(TOKEN_KEY);
 }
@@ -30,13 +35,13 @@ export function ajaxRequest({url, method = "GET", data, formEncoded = false, aut
     });
     const deferred = $.Deferred();
     const retryAfterRefresh = () => request()
-        .done((result) => deferred.resolve(result))
+        .done((result) => deferred.resolve(responseData(result)))
         .fail((retryXhr) => deferred.reject(retryXhr));
-    request().done((result) => deferred.resolve(result)).fail((xhr) => {
+    request().done((result) => deferred.resolve(responseData(result))).fail((xhr) => {
         if (auth && xhr.status === 401 && url !== "/api/auth/refresh") {
             $.ajax({url: "/api/auth/refresh", method: "POST", dataType: "json"})
                 .done((result) => {
-                    saveToken(result.access_token);
+                    saveToken(responseData(result).access_token);
                     retryAfterRefresh();
                 })
                 .fail((refreshXhr) => deferred.reject(refreshXhr));
@@ -62,7 +67,7 @@ export function uploadFile(url, fieldName, file) {
         processData: false,
         contentType: false,
         dataType: "json",
-    });
+    }).then(responseData);
 }
 
 export function errorMessages(xhr) {

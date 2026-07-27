@@ -25,7 +25,7 @@ async def register(client: AsyncClient, username: str = "alice") -> dict:
         json={"username": username, "email": f"{username}@example.com", "password": "password123"},
     )
     assert response.status_code == 201
-    return response.json()
+    return response.json()["data"]
 
 
 async def login(client: AsyncClient, username: str = "alice", password: str = "password123"):
@@ -53,8 +53,8 @@ async def test_login_returns_bearer_token_and_rejects_bad_credentials(client: As
     missing_user = await login(client, username="nobody")
 
     assert success.status_code == 200
-    assert success.json()["token_type"] == "bearer"
-    assert success.json()["access_token"]
+    assert success.json()["data"]["token_type"] == "bearer"
+    assert success.json()["data"]["access_token"]
     assert wrong_password.status_code == missing_user.status_code == 401
     assert wrong_password.json() == missing_user.json()
     assert wrong_password.headers["www-authenticate"] == "Bearer"
@@ -68,7 +68,21 @@ async def test_login_accepts_case_insensitive_email(client: AsyncClient) -> None
     response = await login(client, username=" ALICE@EXAMPLE.COM ")
 
     assert response.status_code == 200
+    assert response.json()["data"]["access_token"]
+
+
+async def test_oauth2_token_keeps_standard_response_for_swagger(client: AsyncClient) -> None:
+    """Swagger 专用端点保持 OAuth2 标准要求的顶层 access_token。"""
+
+    await register(client)
+    response = await client.post(
+        "/api/auth/oauth2-token",
+        data={"username": "alice", "password": "password123"},
+    )
+
+    assert response.status_code == 200
     assert response.json()["access_token"]
+    assert "data" not in response.json()
 
 
 async def test_refresh_rotates_cookie_and_logout_clears_it(client: AsyncClient) -> None:
@@ -81,18 +95,19 @@ async def test_refresh_rotates_cookie_and_logout_clears_it(client: AsyncClient) 
 
     assert first_cookie
     assert refreshed.status_code == 200
-    assert refreshed.json()["access_token"]
+    assert refreshed.json()["data"]["access_token"]
     assert refreshed.cookies.get("refresh_token") != first_cookie
 
     logout = await client.post("/api/auth/logout")
-    assert logout.status_code == 204
+    assert logout.status_code == 200
+    assert logout.json()["data"] is None
 
 
 async def test_create_post_requires_valid_admin_token(
     client: AsyncClient, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
     user = await register(client)
-    token = (await login(client)).json()["access_token"]
+    token = (await login(client)).json()["data"]["access_token"]
     payload = {"title": "JWT protected", "content": "Only administrators publish."}
 
     missing = await client.post("/api/posts", json=payload)
@@ -111,7 +126,7 @@ async def test_create_post_requires_valid_admin_token(
     assert missing.status_code == 401
     assert regular.status_code == 403
     assert admin.status_code == 201
-    assert admin.json()["user_id"] == user["id"]
+    assert admin.json()["data"]["user_id"] == user["id"]
 
 
 async def test_expired_and_forged_tokens_return_401(client: AsyncClient) -> None:
@@ -143,7 +158,7 @@ async def test_admin_can_upload_valid_post_image(
         assert stored_user is not None
         stored_user.is_admin = True
         await session.commit()
-    token = (await login(client)).json()["access_token"]
+    token = (await login(client)).json()["data"]["access_token"]
     target_dir = tmp_path / "post_images"
     monkeypatch.setattr(image_service, "POST_IMAGE_DIR", target_dir)
 
@@ -154,7 +169,7 @@ async def test_admin_can_upload_valid_post_image(
     )
 
     assert response.status_code == 201
-    assert response.json()["url"].startswith("/media/post_images/")
+    assert response.json()["data"]["url"].startswith("/media/post_images/")
     assert len(list(target_dir.glob("*.png"))) == 1
 
 
@@ -162,7 +177,7 @@ async def test_post_image_rejects_regular_user_and_fake_image(client: AsyncClien
     """普通用户不能上传，管理员上传伪造图片时返回 400。"""
 
     user = await register(client)
-    token = (await login(client)).json()["access_token"]
+    token = (await login(client)).json()["data"]["access_token"]
     regular = await client.post(
         "/api/posts/images",
         files={"image": ("fake.png", b"not-an-image", "image/png")},

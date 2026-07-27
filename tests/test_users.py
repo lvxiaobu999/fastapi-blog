@@ -36,7 +36,13 @@ async def test_create_read_and_list_user(
     response = await create_user(client, username="Alice", email="Alice@Example.com")
 
     assert response.status_code == 201
-    body = response.json()
+    envelope = response.json()
+    body = envelope["data"]
+    assert envelope["success"] is True
+    assert envelope["code"] == 0
+    assert envelope["message"] == "ok"
+    assert envelope["meta"]["requestId"] == response.headers["X-Request-ID"]
+    assert envelope["meta"]["timestamp"].endswith("+00:00")
     assert body["username"] == "alice"
     assert body["email"] == "alice@example.com"
     assert "hashed_password" not in body
@@ -44,7 +50,8 @@ async def test_create_read_and_list_user(
     detail = await client.get(f"/api/users/{body['id']}")
     listing = await client.get("/api/users", params={"offset": 0, "limit": 10})
     assert detail.status_code == 200
-    assert [user["id"] for user in listing.json()] == [body["id"]]
+    assert detail.json()["data"]["id"] == body["id"]
+    assert [user["id"] for user in listing.json()["data"]] == [body["id"]]
 
     async with session_factory() as session:
         stored_user = await session.scalar(select(User).where(User.id == body["id"]))
@@ -66,7 +73,7 @@ async def test_update_user_and_password(
     client: AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    user_id = (await create_user(client)).json()["id"]
+    user_id = (await create_user(client)).json()["data"]["id"]
 
     response = await client.patch(
         f"/api/users/{user_id}",
@@ -80,8 +87,8 @@ async def test_update_user_and_password(
     )
 
     assert response.status_code == 200
-    assert response.json()["username"] == "updatedalice"
-    assert response.json()["email"] == "new@example.com"
+    assert response.json()["data"]["username"] == "updatedalice"
+    assert response.json()["data"]["email"] == "new@example.com"
     async with session_factory() as session:
         stored_user = await session.get(User, user_id)
         assert stored_user is not None
@@ -89,11 +96,13 @@ async def test_update_user_and_password(
 
 
 async def test_delete_missing_and_validation_paths(client: AsyncClient) -> None:
-    user_id = (await create_user(client)).json()["id"]
+    user_id = (await create_user(client)).json()["data"]["id"]
 
     headers = auth_headers(user_id)
     assert (await client.delete("/api/users/999", headers=headers)).status_code == 404
-    assert (await client.delete(f"/api/users/{user_id}", headers=headers)).status_code == 204
+    deleted = await client.delete(f"/api/users/{user_id}", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.json()["data"] is None
     assert (await client.get(f"/api/users/{user_id}")).status_code == 404
     invalid = await client.post(
         "/api/users",

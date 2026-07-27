@@ -44,7 +44,7 @@ async def test_list_posts_with_keyword_and_author(
     response = await client.get("/api/posts", params={"keyword": "fastapi"})
 
     assert response.status_code == 200
-    body = response.json()
+    body = response.json()["data"]
     assert [post["id"] for post in body] == [seeded_posts[0]]
     assert body[0]["author"]["username"] == "author"
 
@@ -56,7 +56,7 @@ async def test_list_posts_uses_offset_and_limit(
     response = await client.get("/api/posts", params={"offset": 1, "limit": 1})
 
     assert response.status_code == 200
-    assert [post["id"] for post in response.json()] == [seeded_posts[1]]
+    assert [post["id"] for post in response.json()["data"]] == [seeded_posts[1]]
 
 
 @pytest.mark.parametrize("params", [{"offset": -1}, {"limit": 0}, {"limit": 101}])

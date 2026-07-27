@@ -121,6 +121,7 @@ POST /api/auth/token
       → 加入 sub、iat、exp
       → 使用 SECRET_KEY 和固定 ALGORITHM 签名
   → TokenResponse(access_token, token_type="bearer")
+  → ApiSuccess.data 包裹 TokenResponse
 ```
 
 无论用户名不存在还是密码错误，都返回相同的 `401 Invalid username or password`，避免攻击者通过响应差异枚举账号。
@@ -240,7 +241,7 @@ WWW-Authenticate: Bearer
 
 ### 阶段三：身份依赖
 
-1. 新增 `oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")`。
+1. 新增 `oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/oauth2-token")`。
 2. 实现 `get_current_user`。
 3. 新增一个只需登录的测试端点或直接保护目标业务接口。
 4. 覆盖无 Header、错误格式、伪造 Token、过期 Token、缺少 `sub` 和用户不存在。
@@ -391,7 +392,7 @@ Router 只处理 HTTP 表单、Cookie、响应和状态码；Service 处理 Toke
 | `app/dependencies/auth.py` | `require_admin()` | 当前用户 | 管理员返回 `User`，普通用户返回 403 | 帖子写接口、图片上传 |
 | `app/routers/api_auth.py` | `login()` | OAuth2 用户名密码表单 | 返回 Access JSON，设置 Refresh HttpOnly Cookie | 前端登录表单 |
 | `app/routers/api_auth.py` | `refresh()` | Refresh Cookie | 轮换会话，返回新 Access，覆盖 Refresh Cookie | `api.js` 401 处理 |
-| `app/routers/api_auth.py` | `logout()` | 当前响应对象 | 删除 Refresh Cookie，返回 204 | 前端退出按钮 |
+| `app/routers/api_auth.py` | `logout()` | 当前请求与响应对象 | 删除 Refresh Cookie，返回统一 200 成功响应 | 前端退出按钮 |
 | `migrations/versions/20260724_01_create_refresh_sessions.py` | `upgrade()` | 当前数据库 | 创建表、外键、唯一索引和用户索引 | `alembic upgrade head` |
 
 #### 12.4.2 后端调用顺序为什么这样分层
@@ -553,7 +554,8 @@ layout.html 登录模态框
   → ajaxRequest(formEncoded=true)
   → POST /api/auth/token
   → 后端 Set-Cookie refresh_token（浏览器自动保存）
-  → JSON 返回 access_token
+  → JSON 返回 data.access_token
+  → api.js 自动解包 data
   → saveToken(access_token)
   → localStorage[blog-access-token]
   → window.location.reload()

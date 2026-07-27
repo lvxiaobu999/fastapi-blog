@@ -2,11 +2,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api_responses import success_response
 from app.db.session import get_db
 from app.dependencies.auth import AdminUser
+from app.schemas.api import ApiSuccess
 from app.schemas.post import (
     PostCreate,
     PostCreateRequest,
@@ -25,13 +27,14 @@ router = APIRouter(prefix="/api/posts", tags=["posts"])
 
 @router.post(
     "/images",
-    response_model=ImageUploadResponse,
+    response_model=ApiSuccess[ImageUploadResponse],
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_post_image(
+    request: Request,
     _current_user: AdminUser,
     image: Annotated[UploadFile, File(description="PNG, JPEG, GIF or WebP; max 5 MB")],
-) -> ImageUploadResponse:
+) -> ApiSuccess[ImageUploadResponse]:
     """为富文本编辑器保存图片；只有管理员能够写入帖子媒体目录。"""
 
     try:
@@ -40,7 +43,7 @@ async def upload_post_image(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     finally:
         await image.close()
-    return ImageUploadResponse(url=url)
+    return success_response(request, ImageUploadResponse(url=url))
 
 
 async def _get_post_or_404(session: AsyncSession, post_id: int):
@@ -54,8 +57,13 @@ async def _get_post_or_404(session: AsyncSession, post_id: int):
     return post
 
 
-@router.post("", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
-async def create_post(data: PostCreateRequest, session: DbSession, current_user: AdminUser):
+@router.post("", response_model=ApiSuccess[PostResponse], status_code=status.HTTP_201_CREATED)
+async def create_post(
+    request: Request,
+    data: PostCreateRequest,
+    session: DbSession,
+    current_user: AdminUser,
+) -> ApiSuccess[PostResponse]:
     """由已认证管理员创建帖子；作者 ID 始终取自 JWT 对应用户。
 
     ``PostCreateRequest`` 故意不包含 ``user_id``。如果直接信任前端传来的作者 ID，
@@ -63,41 +71,61 @@ async def create_post(data: PostCreateRequest, session: DbSession, current_user:
     校验的身份，再由服务层保存该 ID。
     """
 
-    return await post_service.create_post(
+    post = await post_service.create_post(
         session, PostCreate(**data.model_dump(), user_id=current_user.id)
     )
+    return success_response(request, post)
 
 
-@router.get("", response_model=list[PostResponse])
+@router.get("", response_model=ApiSuccess[list[PostResponse]])
 async def list_posts(
+    request: Request,
     session: DbSession,
     params: Annotated[PostQueryParams, Query()],
-):
+) -> ApiSuccess[list[PostResponse]]:
     """分页获取帖子列表，并按关键词模糊搜索标题和正文。"""
 
-    return await post_service.list_posts(session, params)
+    posts = await post_service.list_posts(session, params)
+    return success_response(request, posts)
 
 
-@router.get("/{post_id}", response_model=PostResponse)
-async def get_post(post_id: int, session: DbSession):
+@router.get("/{post_id}", response_model=ApiSuccess[PostResponse])
+async def get_post(request: Request, post_id: int, session: DbSession) -> ApiSuccess[PostResponse]:
     """获取单个用户的公开信息。"""
 
-    return await _get_post_or_404(session, post_id)
+    post = await _get_post_or_404(session, post_id)
+    return success_response(request, post)
 
 
-@router.patch("/{post_id}", response_model=PostResponse)
-async def update_post(post_id: int, data: PostUpdate, session: DbSession, _current_user: AdminUser):
+@router.patch("/{post_id}", response_model=ApiSuccess[PostResponse])
+async def update_post(
+    request: Request,
+    post_id: int,
+    data: PostUpdate,
+    session: DbSession,
+    _current_user: AdminUser,
+) -> ApiSuccess[PostResponse]:
     """由已认证管理员部分更新帖子；未传入的字段保持不变。"""
 
     post = await _get_post_or_404(session, post_id)
 
-    return await post_service.update_post(session, post, data)
+    updated = await post_service.update_post(session, post, data)
+    return success_response(request, updated)
 
 
-@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_post(post_id: int, session: DbSession, _current_user: AdminUser) -> Response:
+@router.delete(
+    "/{post_id}",
+    response_model=ApiSuccess[None],
+    status_code=status.HTTP_200_OK,
+)
+async def delete_post(
+    request: Request,
+    post_id: int,
+    session: DbSession,
+    _current_user: AdminUser,
+) -> ApiSuccess[None]:
     """由已认证管理员删除帖子。"""
 
     post = await _get_post_or_404(session, post_id)
     await post_service.delete_post(session, post)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return success_response(request, None)

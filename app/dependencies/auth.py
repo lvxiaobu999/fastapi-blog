@@ -13,7 +13,7 @@ from app.services.auth import touch_refresh_session, verify_access_token
 
 # FastAPI 从 Authorization: Bearer <token> Header 中提取字符串，并在缺失时自动返回
 # 401。tokenUrl 还会让 Swagger 的 Authorize 按钮知道登录接口在哪里。
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/oauth2-token")
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
