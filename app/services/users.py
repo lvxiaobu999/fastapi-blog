@@ -1,6 +1,6 @@
 """用户数据访问与业务规则。"""
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import User
@@ -10,6 +10,12 @@ from app.services.auth import hash_password
 
 class UserAlreadyExistsError(Exception):
     """用户名或邮箱违反唯一约束。"""
+
+
+def _normalize_username(username: str) -> str:
+    """去除用户名首尾空格并转为小写，保证存储和登录规则一致。"""
+
+    return username.strip().lower()
 
 
 def _normalize_email(email: str) -> str:
@@ -27,7 +33,14 @@ async def _ensure_unique_identity(
 ) -> None:
     """在写入前检查用户名和邮箱，并可排除当前正在更新的用户。"""
 
-    statement = select(User.id).where(or_(User.username == username, User.email == email))
+    # func.lower() 让数据库中已有的历史混合大小写数据也参与冲突检查；仅规范化新输入
+    # 不能阻止旧值 "Alice" 与新值 "alice" 在区分大小写的数据库中并存。
+    statement = select(User.id).where(
+        or_(
+            func.lower(User.username) == func.lower(username),
+            func.lower(User.email) == func.lower(email),
+        )
+    )
     if exclude_user_id is not None:
         statement = statement.where(User.id != exclude_user_id)
     if await session.scalar(statement) is not None:
@@ -37,7 +50,7 @@ async def _ensure_unique_identity(
 async def create_user(session: AsyncSession, data: UserCreate, *, is_admin: bool = False) -> User:
     """规范化输入、哈希密码并创建用户；管理员标记只能由后端可信调用方传入。"""
 
-    username = data.username.strip()
+    username = _normalize_username(data.username)
     email = _normalize_email(str(data.email))
     await _ensure_unique_identity(session, username=username, email=email)
 
@@ -93,7 +106,7 @@ async def update_user(session: AsyncSession, user: User, data: UserUpdate) -> Us
     email_value = changes.get("email", user.email)
 
     # username/email 不允许被更新为 null；其余可更新字段在下方分别处理。
-    normalized_username = username.strip() if username is not None else user.username
+    normalized_username = _normalize_username(username) if username is not None else user.username
     normalized_email = _normalize_email(str(email_value)) if email_value is not None else user.email
     await _ensure_unique_identity(
         session,

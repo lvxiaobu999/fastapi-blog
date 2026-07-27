@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import dotenv_values
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -44,7 +44,13 @@ class Settings(BaseSettings):
     # HS256 使用同一个密钥签名和验证，适合当前单体应用；更换算法必须同步编码和解码端。
     algorithm: str = "HS256"
     # Access Token 只有 30 分钟有效期；缩短会增加重新登录频率，延长会扩大泄露后的风险。
-    access_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = Field(default=30, ge=1)
+    # Refresh Session 的最长寿命；即使用户持续操作，也不会超过这个绝对上限。
+    refresh_token_expire_minutes: int = Field(default=7 * 24 * 60, ge=1)
+    # 连续无请求超过该时间后，Refresh Token 不能再换取新的 Access Token。
+    refresh_idle_timeout_minutes: int = Field(default=30, ge=1)
+    # 本地 HTTP 调试设为 False；生产 HTTPS 必须设为 True，防止 Cookie 明文传输。
+    auth_cookie_secure: bool = False
 
     @model_validator(mode="after")
     def validate_database_for_environment(self) -> "Settings":

@@ -51,7 +51,9 @@ $(function () {
     $("[data-auth-guest]").toggleClass("d-none", loggedIn);
     $("[data-auth-user]").toggleClass("d-none", !loggedIn);
     $("[data-logout]").on("click", () => {
-        clearToken();
-        window.location.reload();
+        $.ajax({url: "/api/auth/logout", method: "POST"}).always(() => {
+            clearToken();
+            window.location.reload();
+        });
     });
 });

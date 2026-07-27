@@ -48,7 +48,7 @@ async def test_explicit_password_and_token_helpers() -> None:
 
 async def test_login_returns_bearer_token_and_rejects_bad_credentials(client: AsyncClient) -> None:
     await register(client)
-    success = await login(client)
+    success = await login(client, username=" ALICE ")
     wrong_password = await login(client, password="wrong-password")
     missing_user = await login(client, username="nobody")
 
@@ -58,6 +58,34 @@ async def test_login_returns_bearer_token_and_rejects_bad_credentials(client: As
     assert wrong_password.status_code == missing_user.status_code == 401
     assert wrong_password.json() == missing_user.json()
     assert wrong_password.headers["www-authenticate"] == "Bearer"
+    assert "refresh_token" in success.cookies
+
+
+async def test_login_accepts_case_insensitive_email(client: AsyncClient) -> None:
+    """OAuth2 username 字段也可以提交邮箱，并且邮箱匹配不区分大小写。"""
+
+    await register(client)
+    response = await login(client, username=" ALICE@EXAMPLE.COM ")
+
+    assert response.status_code == 200
+    assert response.json()["access_token"]
+
+
+async def test_refresh_rotates_cookie_and_logout_clears_it(client: AsyncClient) -> None:
+    """Refresh 接口轮换 HttpOnly Cookie，退出接口清除浏览器 Cookie。"""
+
+    await register(client)
+    login_response = await login(client)
+    first_cookie = login_response.cookies.get("refresh_token")
+    refreshed = await client.post("/api/auth/refresh")
+
+    assert first_cookie
+    assert refreshed.status_code == 200
+    assert refreshed.json()["access_token"]
+    assert refreshed.cookies.get("refresh_token") != first_cookie
+
+    logout = await client.post("/api/auth/logout")
+    assert logout.status_code == 204
 
 
 async def test_create_post_requires_valid_admin_token(

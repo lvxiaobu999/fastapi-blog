@@ -33,10 +33,11 @@ async def test_create_read_and_list_user(
     client: AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    response = await create_user(client, email="Alice@Example.com")
+    response = await create_user(client, username="Alice", email="Alice@Example.com")
 
     assert response.status_code == 201
     body = response.json()
+    assert body["username"] == "alice"
     assert body["email"] == "alice@example.com"
     assert "hashed_password" not in body
 
@@ -53,7 +54,9 @@ async def test_create_read_and_list_user(
 
 async def test_create_rejects_duplicate_identity(client: AsyncClient) -> None:
     assert (await create_user(client)).status_code == 201
-    assert (await create_user(client, email="other@example.com")).status_code == 409
+    assert (
+        await create_user(client, username="ALICE", email="other@example.com")
+    ).status_code == 409
     assert (
         await create_user(client, username="other", email="ALICE@example.com")
     ).status_code == 409
@@ -67,11 +70,17 @@ async def test_update_user_and_password(
 
     response = await client.patch(
         f"/api/users/{user_id}",
-        json={"nickname": "Alice", "email": "NEW@example.com", "password": "newpassword123"},
+        json={
+            "username": "UpdatedAlice",
+            "nickname": "Alice",
+            "email": "NEW@example.com",
+            "password": "newpassword123",
+        },
         headers=auth_headers(user_id),
     )
 
     assert response.status_code == 200
+    assert response.json()["username"] == "updatedalice"
     assert response.json()["email"] == "new@example.com"
     async with session_factory() as session:
         stored_user = await session.get(User, user_id)

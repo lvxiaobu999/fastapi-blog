@@ -20,7 +20,7 @@ export function ajaxRequest({url, method = "GET", data, formEncoded = false, aut
         headers.Authorization = `Bearer ${getToken()}`;
     }
 
-    return $.ajax({
+    const request = () => $.ajax({
         url,
         method,
         headers,
@@ -28,6 +28,23 @@ export function ajaxRequest({url, method = "GET", data, formEncoded = false, aut
         contentType: formEncoded ? "application/x-www-form-urlencoded; charset=UTF-8" : "application/json",
         dataType: "json",
     });
+    const deferred = $.Deferred();
+    const retryAfterRefresh = () => request()
+        .done((result) => deferred.resolve(result))
+        .fail((retryXhr) => deferred.reject(retryXhr));
+    request().done((result) => deferred.resolve(result)).fail((xhr) => {
+        if (auth && xhr.status === 401 && url !== "/api/auth/refresh") {
+            $.ajax({url: "/api/auth/refresh", method: "POST", dataType: "json"})
+                .done((result) => {
+                    saveToken(result.access_token);
+                    retryAfterRefresh();
+                })
+                .fail((refreshXhr) => deferred.reject(refreshXhr));
+        } else {
+            deferred.reject(xhr);
+        }
+    });
+    return deferred.promise();
 }
 
 export function uploadFile(url, fieldName, file) {

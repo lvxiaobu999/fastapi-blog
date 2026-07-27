@@ -15,9 +15,9 @@
         <form class="stacked-form" data-login-form>
             <div class="alert d-none" role="alert" data-form-feedback></div>
             <div>
-                <label class="form-label" for="username">用户名</label>
+                <label class="form-label" for="username">用户名或邮箱</label>
                 <input class="form-control form-control-lg" id="username" name="username"
-                       type="text" autocomplete="username" required autofocus
+                       type="text" autocomplete="username" placeholder="用户名或邮箱" required autofocus
                        value="{{ username | default('') }}">
             </div>
             <div>

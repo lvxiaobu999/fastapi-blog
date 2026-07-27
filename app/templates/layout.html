@@ -75,8 +75,9 @@
                 <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭"></button></div>
             <form class="modal-body stacked-form" data-login-form>
                 <div class="alert d-none" role="alert" data-form-feedback></div>
-                <div><label class="form-label" for="modal-login-username">用户名</label>
-                    <input class="form-control" id="modal-login-username" name="username" autocomplete="username" required></div>
+                <div><label class="form-label" for="modal-login-username">用户名或邮箱</label>
+                    <input class="form-control" id="modal-login-username" name="username"
+                           autocomplete="username" placeholder="用户名或邮箱" required></div>
                 <div><label class="form-label" for="modal-login-password">密码</label>
                     <input class="form-control" id="modal-login-password" name="password" type="password" autocomplete="current-password" required></div>
                 <button class="btn btn-primary" type="submit">登录</button>

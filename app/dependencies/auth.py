@@ -3,13 +3,13 @@
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models import User
-from app.services.auth import verify_access_token
+from app.services.auth import touch_refresh_session, verify_access_token
 
 # FastAPI 从 Authorization: Bearer <token> Header 中提取字符串，并在缺失时自动返回
 # 401。tokenUrl 还会让 Swagger 的 Authorize 按钮知道登录接口在哪里。
@@ -33,7 +33,9 @@ def _credentials_error() -> HTTPException:
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)], session: DbSession
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: DbSession,
+    refresh_token: Annotated[str | None, Cookie()] = None,
 ) -> User:
     """验证 JWT 并从数据库加载当前用户，确保授权依据是最新状态。
 
@@ -47,6 +49,9 @@ async def get_current_user(
         raise _credentials_error() from exc
     user = await session.get(User, user_id)
     if user is None:
+        raise _credentials_error()
+    # Cookie 存在时，本次成功认证的业务操作会刷新服务端“最后活动时间”。
+    if refresh_token and not await touch_refresh_session(session, refresh_token, user.id):
         raise _credentials_error()
     return user
 
