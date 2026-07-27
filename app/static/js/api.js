@@ -66,9 +66,14 @@ export function uploadFile(url, fieldName, file) {
 }
 
 export function errorMessages(xhr) {
-    const detail = xhr.responseJSON?.detail;
+    // 新接口统一从 error 读取；detail 兼容尚未迁移或第三方接口的旧 FastAPI 格式。
+    const error = xhr.responseJSON?.error;
+    const detail = error?.details ?? xhr.responseJSON?.detail;
     if (Array.isArray(detail)) {
         return detail.map((item) => item.msg).join("；");
+    }
+    if (typeof error?.message === "string") {
+        return error.message;
     }
     return typeof detail === "string" ? detail : "请求失败，请稍后重试。";
 }

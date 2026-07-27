@@ -1,0 +1,7 @@
+{% extends "error.html" %}
+{% block error_code %}401{% endblock %}
+{% block error_title %}需要登录{% endblock %}
+{% block error_message %}当前页面需要有效身份，请登录后再继续访问。{% endblock %}
+{% block error_action %}
+<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#loginModal">立即登录</button>
+{% endblock %}

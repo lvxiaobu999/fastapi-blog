@@ -56,6 +56,7 @@ $(function () {
     }
 
     let editor = null;
+    let previewViewer = null;
     const editorElement = document.querySelector("#post-editor");
     if (editorElement && window.toastui?.Editor) {
         const source = document.querySelector("#content");
@@ -64,7 +65,10 @@ $(function () {
             el: editorElement,
             height: "520px",
             initialEditType: "wysiwyg",
-            previewStyle: "vertical",
+            // 桌面端并排查看 Markdown 与效果；窄屏使用标签切换，避免两个面板撑破容器。
+            previewStyle: window.matchMedia("(max-width: 767.98px)").matches
+                ? "tab"
+                : "vertical",
             initialValue: source.value,
             plugins: codeSyntaxHighlight ? [codeSyntaxHighlight] : [],
             hooks: {
@@ -76,6 +80,47 @@ $(function () {
             },
         });
     }
+
+    $("[data-post-preview]").on("click", function () {
+        const title = $("[data-post-form] [name=title]").val().trim() || "未命名文章";
+        const markdown = editor
+            ? editor.getMarkdown()
+            : $("[data-post-form] [name=content]").val();
+        const previewElement = document.querySelector("#post-preview-viewer");
+        const emptyElement = document.querySelector("[data-preview-empty]");
+
+        $("[data-preview-title]").text(title);
+        emptyElement.classList.toggle("d-none", Boolean(markdown.trim()));
+        previewElement.classList.toggle("d-none", !markdown.trim());
+
+        if (!markdown.trim()) {
+            return;
+        }
+
+        if (!window.toastui?.Editor?.factory) {
+            // CDN 暂时不可用时仍展示原始 Markdown，避免用户点击预览后看到空白区域。
+            previewElement.textContent = markdown;
+            previewElement.classList.add("post-viewer-fallback");
+            return;
+        }
+        previewElement.classList.remove("post-viewer-fallback");
+
+        if (previewViewer) {
+            // Viewer 可以直接替换 Markdown，无需反复销毁并创建 DOM，连续预览时更流畅。
+            previewViewer.setMarkdown(markdown);
+        } else {
+            const codeSyntaxHighlight = window.toastui.Editor.plugin?.codeSyntaxHighlight;
+            previewViewer = window.toastui.Editor.factory({
+                el: previewElement,
+                viewer: true,
+                initialValue: markdown,
+                plugins: codeSyntaxHighlight ? [codeSyntaxHighlight] : [],
+            });
+        }
+
+        // 预览与详情页共用代码块标题装饰，确保语言标签和深色代码区域一致。
+        window.setTimeout(() => decorateCodeBlocks(previewElement), 0);
+    });
 
     $("[data-post-form]").on("submit", function (event) {
         event.preventDefault();

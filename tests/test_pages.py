@@ -53,7 +53,8 @@ async def test_page_router_returns_html_404(client: AsyncClient) -> None:
     response = await client.get("/posts/999")
 
     assert response.status_code == 404
-    assert "Page not found" in response.text
+    assert "页面不存在" in response.text
+    assert "text/html" in response.headers["content-type"]
 
 
 async def test_layout_uses_auth_modals_and_es_modules(client: AsyncClient) -> None:
@@ -78,6 +79,8 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
 
     assert "toastui-editor-all.min.js" in editor.text
     assert 'id="post-editor"' in editor.text
+    assert "data-post-preview" in editor.text
+    assert 'id="post-preview-viewer"' in editor.text
     assert "toastui-editor-all.min.js" in viewer.text
     assert 'id="post-viewer"' in viewer.text
     assert "/static/js/posts.js" in viewer.text

@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 {% block content %}
 <section class="error-panel" aria-labelledby="error-title">
-    <div class="error-code" aria-hidden="true">{{ status_code | default(404) }}</div>
-    <h1 id="error-title">Page not found</h1>
-    <p>{{ message | default("Sorry, the page you are looking for does not exist or has been moved.") }}</p>
-    <a class="btn btn-primary btn-lg" href="{{ url_for('home') }}">Return to homepage</a>
+    <div class="error-code" aria-hidden="true">{% block error_code %}{{ status_code | default(500) }}{% endblock %}</div>
+    <h1 id="error-title">{% block error_title %}请求无法完成{% endblock %}</h1>
+    <p>{% block error_message %}{{ message | default("暂时无法完成当前请求，请稍后重试。") }}{% endblock %}</p>
+    {% block error_action %}<a class="btn btn-primary" href="{{ url_for('home') }}">返回首页</a>{% endblock %}
 </section>
 {% endblock content %}

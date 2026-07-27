@@ -67,3 +67,8 @@ async def test_list_posts_rejects_invalid_pagination(
     response = await client.get("/api/posts", params=params)
 
     assert response.status_code == 422
+    body = response.json()
+    assert body["success"] is False
+    assert body["error"]["status"] == 422
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert isinstance(body["error"]["details"], list)

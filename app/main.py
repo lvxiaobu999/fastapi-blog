@@ -1,14 +1,13 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core import get_settings
 from app.db.session import engine
+from app.exception_handlers import register_exception_handlers
 from app.routers import api_auth_router, api_posts_router, api_users_router, pages_router
-from app.templating import APP_DIR, templates
+from app.templating import APP_DIR
 
 settings = get_settings()
 
@@ -29,17 +28,4 @@ app.include_router(pages_router)
 app.include_router(api_auth_router)
 app.include_router(api_posts_router)
 app.include_router(api_users_router)
-
-
-@app.exception_handler(404)
-async def not_found(request: Request, exc: StarletteHTTPException):
-    message = exc.detail if isinstance(exc.detail, str) else "The requested page was not found."
-    if request.url.path.startswith("/api/"):
-        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": message})
-
-    return templates.TemplateResponse(
-        request,
-        "error.html",
-        {"title": "Page not found", "status_code": 404, "message": message},
-        status_code=status.HTTP_404_NOT_FOUND,
-    )
+register_exception_handlers(app)
