@@ -86,6 +86,11 @@ a { transition: color 150ms ease; }
 .theme-toggle { color: rgba(255, 255, 255, .8); border: 0; }
 .theme-toggle:hover, .theme-toggle:focus { color: #fff; }
 
+/* authState 在 head 中同步写入，确保首屏不会短暂绘制错误的登录状态。 */
+html[data-auth-state="user"] [data-auth-guest],
+html[data-auth-state="guest"] [data-auth-user] { display: none !important; }
+html[data-auth-state="user"] [data-auth-user] { display: inline-flex !important; }
+
 .page-content { min-height: calc(100vh - 147px); padding-top: 36px; padding-bottom: 56px; }
 
 .site-footer { color: var(--text-muted); font-size: .875rem; }

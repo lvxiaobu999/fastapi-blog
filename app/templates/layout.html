@@ -18,6 +18,10 @@
                 "data-bs-theme",
                 savedTheme === "auto" ? (isDark ? "dark" : "light") : savedTheme
             );
+            // 在浏览器首次绘制导航栏之前确定本地登录状态，避免先显示登录按钮再切换。
+            document.documentElement.dataset.authState = localStorage.getItem("blog-access-token")
+                ? "user"
+                : "guest";
         })();
     </script>
     <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">

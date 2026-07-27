@@ -66,6 +66,8 @@ async def test_layout_uses_auth_modals_and_es_modules(client: AsyncClient) -> No
     assert 'data-bs-target="#registerModal"' in response.text
     assert 'type="module"' in response.text
     assert "/static/js/auth.js" in response.text
+    assert "dataset.authState" in response.text
+    assert 'localStorage.getItem("blog-access-token")' in response.text
 
 
 async def test_post_pages_include_rich_editor_and_markdown_viewer(

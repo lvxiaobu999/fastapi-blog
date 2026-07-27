@@ -6,13 +6,14 @@
 
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ExceptionHandler
 
 from app.templating import templates
 
@@ -161,6 +162,18 @@ async def unexpected_exception_handler(request: Request, exc: Exception) -> Resp
 def register_exception_handlers(app: FastAPI) -> None:
     """在 FastAPI 应用上注册异常类型与统一处理函数的映射。"""
 
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)
-    app.add_exception_handler(Exception, unexpected_exception_handler)
+    # Starlette 的 ExceptionHandler 同时包含 HTTP 和 WebSocket 两种函数签名，Pylance
+    # 无法根据第一个异常类型参数自动缩窄联合类型。这里显式转换注册边界的类型，处理
+    # 函数本身仍保留具体异常类型，内部访问 detail/errors 时继续受到静态检查保护。
+    app.add_exception_handler(
+        StarletteHTTPException,
+        cast(ExceptionHandler, http_exception_handler),
+    )
+    app.add_exception_handler(
+        RequestValidationError,
+        cast(ExceptionHandler, validation_exception_handler),
+    )
+    app.add_exception_handler(
+        Exception,
+        cast(ExceptionHandler, unexpected_exception_handler),
+    )
