@@ -6,14 +6,14 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api_responses import success_response
+from app.api_responses import API_ERROR_RESPONSES, success_response
 from app.core import get_settings
 from app.db.session import get_db
 from app.schemas.auth import TokenResponse
 from app.schemas.api import ApiSuccess
 from app.services import auth as auth_service
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["auth"], responses=API_ERROR_RESPONSES)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 

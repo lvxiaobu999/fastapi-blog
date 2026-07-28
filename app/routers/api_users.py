@@ -5,14 +5,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api_responses import success_response
+from app.api_responses import API_ERROR_RESPONSES, success_response
 from app.db.session import get_db
 from app.dependencies.auth import CurrentUser
 from app.schemas import UserCreate, UserResponse, UserUpdate
 from app.schemas.api import ApiSuccess
 from app.services import users as user_service
 
-router = APIRouter(prefix="/api/users", tags=["users"])
+router = APIRouter(prefix="/api/users", tags=["users"], responses=API_ERROR_RESPONSES)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 

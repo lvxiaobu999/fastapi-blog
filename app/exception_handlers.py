@@ -6,28 +6,29 @@
 
 import logging
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import cast
 
 from fastapi import FastAPI, Request, status
-from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ExceptionHandler
 
+from app.api_responses import failure_response
+from app.schemas.api import ApiErrorItem
 from app.templating import templates
 
 logger = logging.getLogger(__name__)
 
 _ERROR_CODES = {
-    400: "BAD_REQUEST",
-    401: "UNAUTHORIZED",
-    403: "FORBIDDEN",
-    404: "NOT_FOUND",
-    405: "METHOD_NOT_ALLOWED",
-    409: "CONFLICT",
-    422: "VALIDATION_ERROR",
-    500: "INTERNAL_SERVER_ERROR",
+    400: 40001,
+    401: 40101,
+    403: 40301,
+    404: 40401,
+    405: 40501,
+    409: 40901,
+    422: 42201,
+    500: 50001,
 }
 
 _PAGE_TEMPLATES = {
@@ -49,35 +50,53 @@ def _is_api_request(request: Request) -> bool:
     return request.url.path.startswith("/api/")
 
 
-def _error_code(status_code: int) -> str:
+def _error_code(status_code: int) -> int:
     """把 HTTP 状态码转换为便于前端判断的稳定错误代码。"""
 
-    return _ERROR_CODES.get(status_code, "HTTP_ERROR")
+    return _ERROR_CODES.get(status_code, status_code * 100 + 1)
+
+
+def _validation_errors(exc: RequestValidationError) -> list[ApiErrorItem]:
+    """把 Pydantic 错误转换为稳定、可 JSON 序列化的前端字段错误。"""
+
+    items: list[ApiErrorItem] = []
+    for error in exc.errors():
+        # body/query/path 说明参数来源，不属于表单字段名；嵌套字段仍用点连接保留层级。
+        parts = [
+            str(part)
+            for part in error.get("loc", ())
+            if part not in {"body", "query", "path", "header", "cookie"}
+        ]
+        items.append(
+            ApiErrorItem(
+                field=".".join(parts) or None,
+                message=str(error.get("msg", "Invalid value")),
+                type=str(error.get("type", "validation_error")),
+            )
+        )
+    return items
 
 
 def api_error_response(
     *,
+    request: Request,
     status_code: int,
     message: str,
-    details: Any = None,
+    errors: list[ApiErrorItem] | None = None,
     headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     """创建统一 API 错误响应，不向客户端暴露 Python 异常或调用栈。"""
 
+    result = failure_response(
+        request,
+        code=_error_code(status_code),
+        message=message,
+        errors=errors,
+    )
     return JSONResponse(
         status_code=status_code,
         headers=headers,
-        content=jsonable_encoder(
-            {
-                "success": False,
-                "error": {
-                    "status": status_code,
-                    "code": _error_code(status_code),
-                    "message": message,
-                    "details": details,
-                },
-            },
-        ),
+        content=result.model_dump(mode="json", by_alias=True),
     )
 
 
@@ -90,9 +109,9 @@ async def http_exception_handler(
     message = exc.detail if isinstance(exc.detail, str) else "Request failed"
     if _is_api_request(request):
         return api_error_response(
+            request=request,
             status_code=exc.status_code,
             message=message,
-            details=None if isinstance(exc.detail, str) else exc.detail,
             headers=exc.headers,
         )
 
@@ -118,9 +137,10 @@ async def validation_exception_handler(
 
     if _is_api_request(request):
         return api_error_response(
+            request=request,
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             message="Request validation failed",
-            details=exc.errors(),
+            errors=_validation_errors(exc),
         )
 
     return templates.TemplateResponse(
@@ -147,6 +167,7 @@ async def unexpected_exception_handler(request: Request, exc: Exception) -> Resp
     )
     if _is_api_request(request):
         return api_error_response(
+            request=request,
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="Internal server error",
         )

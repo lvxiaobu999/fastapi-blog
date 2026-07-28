@@ -56,7 +56,10 @@ async def test_login_returns_bearer_token_and_rejects_bad_credentials(client: As
     assert success.json()["data"]["token_type"] == "bearer"
     assert success.json()["data"]["access_token"]
     assert wrong_password.status_code == missing_user.status_code == 401
-    assert wrong_password.json() == missing_user.json()
+    # 每个请求的 meta.requestId 和 timestamp 本来就不同，只比较不会泄露账号状态的错误字段。
+    assert wrong_password.json()["code"] == missing_user.json()["code"] == 40101
+    assert wrong_password.json()["message"] == missing_user.json()["message"]
+    assert wrong_password.json()["errors"] == missing_user.json()["errors"] is None
     assert wrong_password.headers["www-authenticate"] == "Bearer"
     assert "refresh_token" in success.cookies
 

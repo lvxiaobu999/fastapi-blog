@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api_responses import success_response
+from app.api_responses import API_ERROR_RESPONSES, success_response
 from app.db.session import get_db
 from app.dependencies.auth import AdminUser
 from app.schemas.api import ApiSuccess
@@ -22,7 +22,7 @@ from app.services import posts as post_service
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
-router = APIRouter(prefix="/api/posts", tags=["posts"])
+router = APIRouter(prefix="/api/posts", tags=["posts"], responses=API_ERROR_RESPONSES)
 
 
 @router.post(

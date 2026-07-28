@@ -43,14 +43,26 @@ async def test_unknown_api_returns_unified_json(client: AsyncClient) -> None:
     response = await client.get("/api/not-found")
 
     assert response.status_code == 404
-    assert response.json() == {
-        "success": False,
-        "error": {
-            "status": 404,
-            "code": "NOT_FOUND",
-            "message": "Not Found",
-            "details": None,
-        },
+    body = response.json()
+    assert body["success"] is False
+    assert body["code"] == 40401
+    assert body["message"] == "Not Found"
+    assert body["data"] is None
+    assert body["errors"] is None
+    assert body["meta"]["requestId"] == response.headers["X-Request-ID"]
+    assert body["meta"]["timestamp"].endswith("+00:00")
+
+
+async def test_openapi_documents_unified_api_failure() -> None:
+    """业务 API 的 Swagger 文档应引用与运行时一致的失败响应 Schema。"""
+
+    operation = app.openapi()["paths"]["/api/posts"]["post"]
+
+    assert operation["responses"]["401"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ApiFailure"
+    }
+    assert operation["responses"]["422"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ApiFailure"
     }
 
 
@@ -85,7 +97,10 @@ async def test_unexpected_errors_hide_details_from_api_and_page() -> None:
     api_body = json.loads(api_response.body)
 
     assert api_response.status_code == 500
-    assert api_body["error"]["code"] == "INTERNAL_SERVER_ERROR"
+    assert api_body["success"] is False
+    assert api_body["code"] == 50001
+    assert api_body["data"] is None
+    assert api_body["errors"] is None
     assert "database password leaked" not in api_response.body.decode()
     assert page_response.status_code == 500
     assert "服务器暂时出现异常".encode() in page_response.body
