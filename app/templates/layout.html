@@ -47,6 +47,17 @@
                     </li>
                 </ul>
                 <div class="navbar-actions">
+                    <button class="btn navbar-search-trigger" type="button"
+                            data-bs-toggle="modal" data-bs-target="#searchModal"
+                            aria-label="搜索文章">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
+                            <path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
+                                  fill="none" stroke="currentColor" stroke-width="2"
+                                  stroke-linecap="round"/>
+                        </svg>
+                        <span>搜索</span>
+                        <kbd>Ctrl K</kbd>
+                    </button>
                     <button class="btn btn-outline-light" type="button" data-auth-guest
                             data-bs-toggle="modal" data-bs-target="#loginModal">登录</button>
                     <button class="btn btn-light" type="button" data-auth-guest
@@ -82,6 +93,38 @@
             <span>记录技术，也记录思考。</span>
         </div>
     </footer>
+
+    <div class="modal fade search-modal" id="searchModal" tabindex="-1"
+         aria-labelledby="searchModalTitle" aria-hidden="true" data-search-modal>
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header search-modal-header">
+                    <div>
+                        <span class="eyebrow">SEARCH</span>
+                        <h2 class="modal-title fs-5" id="searchModalTitle">搜索文章</h2>
+                    </div>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭搜索"></button>
+                </div>
+                <div class="modal-body search-modal-body">
+                    <div class="search-input-wrap">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"
+                                  fill="none" stroke="currentColor" stroke-width="2"
+                                  stroke-linecap="round"/>
+                        </svg>
+                        <label class="visually-hidden" for="site-search-keyword">按标题搜索文章</label>
+                        <input class="form-control" id="site-search-keyword" type="search"
+                               maxlength="100" autocomplete="off"
+                               placeholder="输入文章标题…" data-site-search>
+                    </div>
+                    <p class="search-status" aria-live="polite" data-search-status>
+                        输入关键词开始搜索
+                    </p>
+                    <div class="search-results" data-search-results></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
@@ -122,6 +165,7 @@
     <script src="{{ url_for('static', path='js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/theme.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/auth.js') }}"></script>
+    <script type="module" src="{{ url_for('static', path='js/search.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/posts.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/forms.js') }}"></script>
     {% block scripts %}{% endblock scripts %}

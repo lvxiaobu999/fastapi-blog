@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.post import PostQueryParams
+from app.services import categories as category_service
 from app.services import posts as post_service
 from app.services import users as user_service
 from app.templating import templates
@@ -25,13 +26,23 @@ async def home(
     session: DbSession,
     params: Annotated[PostQueryParams, Query()],
 ):
-    """渲染首页和帖子列表页，支持关键词与分页查询。"""
+    """渲染首页和帖子列表页，支持分类、关键词与分页查询。"""
 
     posts = await post_service.list_posts(session, params)
+    categories = await category_service.list_categories(session)
+    selected_category = next(
+        (category for category in categories if category.slug == params.category), None
+    )
     return templates.TemplateResponse(
         request,
         "home.html",
-        {"posts": posts, "title": "Home", "query": params},
+        {
+            "posts": posts,
+            "categories": categories,
+            "selected_category": selected_category,
+            "title": "Home",
+            "query": params,
+        },
     )
 
 
@@ -65,10 +76,15 @@ async def profile_page(request: Request, user_id: int, session: DbSession):
 
 
 @router.get("/posts/new", name="post_create")
-async def new_post_page(request: Request):
-    """渲染新建帖子表单；表单提交接口尚未实现。"""
+async def new_post_page(request: Request, session: DbSession):
+    """渲染带分类选择的新建帖子表单。"""
 
-    return templates.TemplateResponse(request, "post_form.html", {"title": "New post"})
+    categories = await category_service.list_categories(session)
+    return templates.TemplateResponse(
+        request,
+        "post_form.html",
+        {"categories": categories, "title": "New post"},
+    )
 
 
 @router.get("/posts/{post_id}/edit", name="post_edit")
@@ -79,10 +95,12 @@ async def edit_post_page(request: Request, post_id: int, session: DbSession):
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
+    categories = await category_service.list_categories(session)
+
     return templates.TemplateResponse(
         request,
         "post_form.html",
-        {"post": post, "title": "Edit post"},
+        {"post": post, "categories": categories, "title": "Edit post"},
     )
 
 

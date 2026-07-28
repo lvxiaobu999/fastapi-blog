@@ -14,6 +14,8 @@ from app.schemas.post import (
     PostCreateRequest,
     PostQueryParams,
     PostResponse,
+    PostTitleSearchParams,
+    PostTitleSearchResult,
     PostUpdate,
 )
 from app.schemas.upload import ImageUploadResponse
@@ -71,9 +73,14 @@ async def create_post(
     校验的身份，再由服务层保存该 ID。
     """
 
-    post = await post_service.create_post(
-        session, PostCreate(**data.model_dump(), user_id=current_user.id)
-    )
+    try:
+        post = await post_service.create_post(
+            session, PostCreate(**data.model_dump(), user_id=current_user.id)
+        )
+    except post_service.PostCategoryNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        ) from exc
     # Service 返回 SQLAlchemy Post；Router 在公开响应边界转换为 PostResponse，既过滤
     # ORM 内部字段，也让 ApiSuccess 的泛型参数与声明的返回类型完全一致。
     return success_response(request, PostResponse.model_validate(post))
@@ -85,10 +92,23 @@ async def list_posts(
     session: DbSession,
     params: Annotated[PostQueryParams, Query()],
 ) -> ApiSuccess[list[PostResponse]]:
-    """分页获取帖子列表，并按关键词模糊搜索标题和正文。"""
+    """分页获取帖子列表，并按关键词或分类 slug 筛选。"""
 
     posts = await post_service.list_posts(session, params)
     data = [PostResponse.model_validate(post) for post in posts]
+    return success_response(request, data)
+
+
+@router.get("/search", response_model=ApiSuccess[list[PostTitleSearchResult]])
+async def search_post_titles(
+    request: Request,
+    session: DbSession,
+    params: Annotated[PostTitleSearchParams, Query()],
+) -> ApiSuccess[list[PostTitleSearchResult]]:
+    """为导航搜索弹窗返回标题候选，不传输文章正文。"""
+
+    posts = await post_service.search_post_titles(session, params)
+    data = [PostTitleSearchResult.model_validate(post) for post in posts]
     return success_response(request, data)
 
 
@@ -112,7 +132,12 @@ async def update_post(
 
     post = await _get_post_or_404(session, post_id)
 
-    updated = await post_service.update_post(session, post, data)
+    try:
+        updated = await post_service.update_post(session, post, data)
+    except post_service.PostCategoryNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        ) from exc
     return success_response(request, PostResponse.model_validate(updated))
 
 

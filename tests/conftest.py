@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.models import Category
 
 
 @pytest.fixture
@@ -41,6 +42,23 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         async with engine.begin() as connection:
             await connection.run_sync(Base.metadata.drop_all)
         await engine.dispose()
+
+
+@pytest.fixture
+async def seeded_categories(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> dict[str, int]:
+    """写入帖子测试共用的分类，并按 slug 返回主键。"""
+
+    async with session_factory() as session:
+        categories = [
+            Category(name="FastAPI", slug="fastapi", sort_order=10),
+            Category(name="Python", slug="python", sort_order=20),
+            Category(name="其它", slug="other", sort_order=30),
+        ]
+        session.add_all(categories)
+        await session.commit()
+        return {category.slug: category.id for category in categories}
 
 
 @pytest.fixture

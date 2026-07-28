@@ -4,12 +4,19 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models import User
-from app.schemas.post import PostCreate, PostQueryParams, PostUpdate
+from app.schemas.post import (
+    PostCreate,
+    PostQueryParams,
+    PostTitleSearchParams,
+    PostUpdate,
+)
 from app.services.posts import (
     PostAuthorNotFoundError,
+    PostCategoryNotFoundError,
     create_post,
     get_post,
     list_posts,
+    search_post_titles,
     update_post,
 )
 
@@ -25,7 +32,8 @@ async def session(
 
 
 @pytest.fixture
-async def author(session: AsyncSession) -> User:
+async def author(session: AsyncSession, seeded_categories: dict[str, int]) -> User:
+    assert seeded_categories["other"] > 0
     user = User(username="author", email="author@example.com", hashed_password="hash")
     session.add(user)
     await session.commit()
@@ -42,6 +50,7 @@ async def test_create_post_with_author(session: AsyncSession, author: User) -> N
     assert post.id is not None
     assert post.content == "Post body"
     assert post.user_id == author.id
+    assert post.category.slug == "other"
 
 
 async def test_create_post_rejects_missing_author(session: AsyncSession) -> None:
@@ -49,6 +58,21 @@ async def test_create_post_rejects_missing_author(session: AsyncSession) -> None
         await create_post(
             session,
             PostCreate(title="Missing author", content="Post body", user_id=999),
+        )
+
+
+async def test_create_post_rejects_missing_category(
+    session: AsyncSession, author: User
+) -> None:
+    with pytest.raises(PostCategoryNotFoundError):
+        await create_post(
+            session,
+            PostCreate(
+                title="Missing category",
+                content="Post body",
+                user_id=author.id,
+                category_id=999,
+            ),
         )
 
 
@@ -126,6 +150,54 @@ async def test_list_posts_supports_pagination(session: AsyncSession, author: Use
     results = await list_posts(session, PostQueryParams(offset=1, limit=1))
 
     assert [post.id for post in results] == [posts[1].id]
+
+
+async def test_list_posts_filters_category_slug(
+    session: AsyncSession,
+    author: User,
+    seeded_categories: dict[str, int],
+) -> None:
+    fastapi_post = await create_post(
+        session,
+        PostCreate(
+            title="FastAPI filters",
+            content="Body",
+            user_id=author.id,
+            category_id=seeded_categories["fastapi"],
+        ),
+    )
+    await create_post(
+        session,
+        PostCreate(
+            title="Python filters",
+            content="Body",
+            user_id=author.id,
+            category_id=seeded_categories["python"],
+        ),
+    )
+
+    results = await list_posts(session, PostQueryParams(category="fastapi"))
+
+    assert [post.id for post in results] == [fastapi_post.id]
+
+
+async def test_title_search_does_not_match_content(
+    session: AsyncSession, author: User
+) -> None:
+    title_match = await create_post(
+        session,
+        PostCreate(title="FastAPI search", content="Body", user_id=author.id),
+    )
+    await create_post(
+        session,
+        PostCreate(title="Another title", content="FastAPI in body", user_id=author.id),
+    )
+
+    results = await search_post_titles(
+        session, PostTitleSearchParams(keyword="fastapi")
+    )
+
+    assert [post.id for post in results] == [title_match.id]
 
 
 async def test_search_escapes_like_wildcards(session: AsyncSession, author: User) -> None:

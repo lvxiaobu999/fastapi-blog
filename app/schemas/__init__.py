@@ -1,4 +1,12 @@
-from .post import PostBase, PostCreate, PostQueryParams, PostResponse, PostUpdate
+from .post import (
+    PostBase,
+    PostCreate,
+    PostQueryParams,
+    PostResponse,
+    PostTitleSearchParams,
+    PostTitleSearchResult,
+    PostUpdate,
+)
 from .user import UserCreate, UserResponse, UserUpdate
 
 __all__ = [
@@ -6,6 +14,8 @@ __all__ = [
     "PostCreate",
     "PostQueryParams",
     "PostResponse",
+    "PostTitleSearchParams",
+    "PostTitleSearchResult",
     "PostUpdate",
     "UserCreate",
     "UserResponse",

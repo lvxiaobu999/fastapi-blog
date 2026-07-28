@@ -40,16 +40,33 @@ class PostUpdate(BaseModel):
         """PATCH 允许省略分类，但不允许把已有帖子的分类显式清空。"""
 
         if value is None:
-            return value
+            raise ValueError("category_id cannot be null")
         return value
 
 
 class PostQueryParams(BaseModel):
-    """帖子列表查询参数；keyword 为空时不进行关键词过滤。"""
+    """帖子列表查询参数；关键词和分类均为空时返回全部帖子。"""
 
     keyword: str | None = Field(default=None, min_length=1, max_length=100)
+    category: str | None = Field(default=None, min_length=1, max_length=50)
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=20, ge=1, le=100)
+
+
+class PostTitleSearchParams(BaseModel):
+    """导航搜索弹窗的查询参数，只允许小批量返回标题候选项。"""
+
+    keyword: str = Field(min_length=1, max_length=100)
+    limit: int = Field(default=8, ge=1, le=20)
+
+
+class PostTitleSearchResult(BaseModel):
+    """搜索弹窗使用的轻量结果，不传输文章正文和作者等无关字段。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str = Field(min_length=1, max_length=100)
 
 
 class PostResponse(PostBase):

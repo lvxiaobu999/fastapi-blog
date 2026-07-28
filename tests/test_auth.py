@@ -107,11 +107,17 @@ async def test_refresh_rotates_cookie_and_logout_clears_it(client: AsyncClient) 
 
 
 async def test_create_post_requires_valid_admin_token(
-    client: AsyncClient, session_factory: async_sessionmaker[AsyncSession]
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seeded_categories: dict[str, int],
 ) -> None:
     user = await register(client)
     token = (await login(client)).json()["data"]["access_token"]
-    payload = {"title": "JWT protected", "content": "Only administrators publish."}
+    payload = {
+        "title": "JWT protected",
+        "content": "Only administrators publish.",
+        "category_id": seeded_categories["fastapi"],
+    }
 
     missing = await client.post("/api/posts", json=payload)
     regular = await client.post(

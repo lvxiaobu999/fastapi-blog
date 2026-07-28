@@ -132,6 +132,7 @@ $(function () {
             auth: true,
             data: {
                 title: $form.find("[name=title]").val(),
+                category_id: Number($form.find("[name=category_id]").val()),
                 content: editor ? editor.getMarkdown() : $form.find("[name=content]").val(),
             },
         }).done((post) => {

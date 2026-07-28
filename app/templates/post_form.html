@@ -34,6 +34,19 @@
                 <div class="form-text">1～100 个字符。</div>
             </div>
             <div>
+                <label class="form-label" for="category_id">分类</label>
+                <select class="form-select" id="category_id" name="category_id" required>
+                    <option value="" disabled{% if not post | default(none) %} selected{% endif %}>请选择文章分类</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}"
+                            {% if post | default(none) and post.category_id == category.id %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="form-text">分类会显示在首页，并用于筛选对应文章。</div>
+            </div>
+            <div>
                 <label class="form-label" for="content">正文</label>
                 <div id="post-editor" class="post-editor"></div>
                 <textarea class="d-none" id="content" name="content">{{ post.content | default('') if post | default(none) else '' }}</textarea>
