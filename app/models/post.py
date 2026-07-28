@@ -15,6 +15,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     # 仅供类型检查器识别，不在运行时导入，避免 Post 与 User 互相导入。
     from app.models.user import User
+    from app.models.category import Category
 
 
 class Post(Base):
@@ -43,6 +44,14 @@ class Post(Base):
         index=True,
     )
 
+    # 每篇帖子必须属于一个分类；分类删除使用 RESTRICT，避免文章变成无分类孤儿数据。
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+
     # author 不是数据库列，而是 SQLAlchemy 根据 user_id 加载出的 User 对象。
     # back_populates 与 User.posts 成对出现，修改任意一侧时 ORM 能同步关系状态。
     author: Mapped["User"] = relationship(back_populates="posts")
+    category: Mapped["Category"] = relationship(back_populates="posts")

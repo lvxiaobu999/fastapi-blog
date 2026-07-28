@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.category import CategoryResponse
 from app.schemas.user import UserPublic
 
 
@@ -13,13 +14,17 @@ class PostBase(BaseModel):
 
 
 class PostCreate(PostBase):
-    """创建帖子时需要指定作者用户 ID。"""
+    """Service 内部创建帖子时使用的完整数据。"""
 
     user_id: int
+    # 旧 Service 调用未传分类时落到“其它”；HTTP 创建请求仍要求明确选择分类。
+    category_id: int | None = Field(default=None, gt=0)
 
 
 class PostCreateRequest(PostBase):
     """发帖 HTTP 请求；作者必须从 JWT 获取，客户端不能指定 user_id。"""
+
+    category_id: int = Field(gt=0)
 
 
 class PostUpdate(BaseModel):
@@ -27,6 +32,16 @@ class PostUpdate(BaseModel):
 
     title: str | None = Field(default=None, min_length=1, max_length=100)
     content: str | None = Field(default=None, min_length=1)
+    category_id: int | None = Field(default=None, gt=0)
+
+    @field_validator("category_id")
+    @classmethod
+    def category_cannot_be_null(cls, value: int | None) -> int | None:
+        """PATCH 允许省略分类，但不允许把已有帖子的分类显式清空。"""
+
+        if value is None:
+            return value
+        return value
 
 
 class PostQueryParams(BaseModel):
@@ -46,3 +61,5 @@ class PostResponse(PostBase):
     created_at: datetime
     user_id: int
     author: UserPublic
+    category_id: int
+    category: CategoryResponse
