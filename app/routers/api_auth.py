@@ -11,6 +11,8 @@ from app.core import get_settings
 from app.db.session import get_db
 from app.schemas.auth import TokenResponse
 from app.schemas.api import ApiSuccess
+from app.schemas.user import UserResponse
+from app.dependencies.auth import CurrentUser
 from app.services import auth as auth_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"], responses=API_ERROR_RESPONSES)
@@ -113,3 +115,10 @@ async def logout(request: Request, response: Response) -> ApiSuccess[None]:
 
     response.delete_cookie("refresh_token", path="/api")
     return success_response(request, None)
+
+
+@router.get("/me", response_model=ApiSuccess[UserResponse])
+async def current_session(request: Request, current_user: CurrentUser) -> ApiSuccess[UserResponse]:
+    """验证当前 Access Token，并返回导航会话所需的当前用户。"""
+
+    return success_response(request, UserResponse.model_validate(current_user))

@@ -1,6 +1,7 @@
 /** 帖子写入表单；公共 AJAX 封装会自动附加当前会话的 Bearer Token。 */
 
 import {ajaxRequest, errorMessages, uploadFile} from "./api.js";
+import {setButtonLoading} from "./ui.js";
 
 function decorateCodeBlocks(root) {
     root.querySelectorAll("pre").forEach((pre) => {
@@ -126,6 +127,8 @@ $(function () {
         event.preventDefault();
         const $form = $(this);
         const postId = $form.data("post-id");
+        const button = $form.find("[type=submit]")[0];
+        if (!setButtonLoading(button, true, postId ? "保存中…" : "发布中…")) return;
         ajaxRequest({
             url: postId ? `/api/posts/${postId}` : "/api/posts",
             method: postId ? "PATCH" : "POST",
@@ -138,6 +141,7 @@ $(function () {
         }).done((post) => {
             window.location.assign(`/posts/${post.id}`);
         }).fail((xhr) => {
+            setButtonLoading(button, false);
             $form.find("[data-form-feedback]")
                 .removeClass("d-none")
                 .text(errorMessages(xhr));

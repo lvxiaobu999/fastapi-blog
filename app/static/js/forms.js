@@ -1,9 +1,12 @@
 /** 搜索与个人资料表单 AJAX 行为；页面中的表单不再触发浏览器原生提交。 */
 
 import {ajaxRequest, errorMessages} from "./api.js";
+import {setButtonLoading} from "./ui.js";
 
 $(document).on("submit", "[data-search-form]", function (event) {
     event.preventDefault();
+    const button = this.querySelector("[type=submit]");
+    if (!setButtonLoading(button, true, "搜索中…")) return;
     const url = `${this.action}?${$(this).serialize()}`;
     $.ajax({url, method: "GET", dataType: "html"})
         .done((html) => {
@@ -11,7 +14,8 @@ $(document).on("submit", "[data-search-form]", function (event) {
             $("main.page-content").html($(nextDocument).find("main.page-content").html());
             window.history.pushState({}, "", url);
         })
-        .fail(() => window.alert("搜索失败，请稍后重试。"));
+        .fail(() => window.alert("搜索失败，请稍后重试。"))
+        .always(() => setButtonLoading(button, false));
 });
 
 $(document).on("submit", "[data-profile-form]", function (event) {
@@ -24,6 +28,8 @@ $(document).on("submit", "[data-profile-form]", function (event) {
             .text("头像上传接口尚未实现，请先清空头像文件后保存其他资料。");
         return;
     }
+    const button = $form.find("[type=submit]")[0];
+    if (!setButtonLoading(button, true, "保存中…")) return;
     ajaxRequest({
         url: `/api/users/${$form.data("user-id")}`,
         method: "PATCH",
@@ -43,5 +49,5 @@ $(document).on("submit", "[data-profile-form]", function (event) {
             .removeClass("d-none alert-success")
             .addClass("alert-danger")
             .text(errorMessages(xhr));
-    });
+    }).always(() => setButtonLoading(button, false));
 });
