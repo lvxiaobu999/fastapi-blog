@@ -75,6 +75,13 @@ async def profile_page(request: Request, user_id: int, session: DbSession):
     )
 
 
+@router.get("/me/activities", name="my_activities")
+async def my_activities_page(request: Request):
+    """渲染当前用户活动列表外壳；真实数据由受保护 API 按标签加载。"""
+
+    return templates.TemplateResponse(request, "activities.html", {"title": "我的活动"})
+
+
 @router.get("/posts/new", name="post_create")
 async def new_post_page(request: Request, session: DbSession):
     """渲染带分类选择的新建帖子表单。"""

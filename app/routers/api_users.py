@@ -74,7 +74,7 @@ async def update_user(
     session: DbSession,
     current_user: CurrentUser,
 ) -> ApiSuccess[UserResponse]:
-    """用户本人或管理员部分更新资料；未传入的字段保持不变。"""
+    """用户本人或管理员更新昵称和邮箱；用户名只能由管理员后台维护。"""
 
     user = await _get_user_or_404(session, user_id)
     if current_user.id != user.id and not current_user.is_admin:

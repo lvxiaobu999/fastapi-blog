@@ -22,14 +22,12 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    """用户部分更新参数；未传入的字段保持原值。"""
+    """用户可自行修改的资料；登录名、密码和头像由各自专用流程维护。"""
 
-    username: str | None = Field(default=None, min_length=1, max_length=50)
+    model_config = ConfigDict(extra="forbid")
+
     email: EmailStr | None = Field(default=None, max_length=254)
-    password: str | None = Field(default=None, min_length=8, max_length=128)
     nickname: str | None = Field(default=None, min_length=1, max_length=50)
-    # 传入 null 表示恢复默认头像，因此 image_file 需要允许 None。
-    image_file: str | None = Field(default=None, max_length=200)
 
 
 class UserPublic(BaseModel):

@@ -10,6 +10,7 @@ from app.core import get_settings
 from app.db.session import engine
 from app.exception_handlers import register_exception_handlers
 from app.routers import (
+    api_activities_router,
     api_admin_router,
     api_auth_router,
     api_posts_router,
@@ -47,6 +48,7 @@ async def add_request_id(request: Request, call_next: RequestResponseEndpoint) -
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 app.mount("/media", StaticFiles(directory=APP_DIR / "media"), name="media")
 app.include_router(pages_router)
+app.include_router(api_activities_router)
 app.include_router(api_admin_router)
 app.include_router(api_auth_router)
 app.include_router(api_posts_router)

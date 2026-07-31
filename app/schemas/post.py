@@ -80,3 +80,36 @@ class PostResponse(PostBase):
     author: UserPublic
     category_id: int
     category: CategoryResponse
+    view_count: int = Field(ge=0)
+
+
+class PostInteractionState(BaseModel):
+    """文章详情操作区状态；未登录用户的两个布尔值均为 ``False``。"""
+
+    # 下面三个 count 是页面要显示的全站统计值；ge=0 禁止输出负数。
+    view_count: int = Field(ge=0)  # 文章累计被打开多少次。
+    like_count: int = Field(ge=0)  # post_likes 表中属于该文章的记录数。
+    favorite_count: int = Field(ge=0)  # post_favorites 表中的对应记录数。
+    # 下面两个布尔值只描述“当前登录用户”。游客没有用户身份，因此都是 False。
+    liked: bool  # 当前用户是否已经点赞，用于决定按钮是否高亮。
+    favorited: bool  # 当前用户是否已经收藏，用于决定按钮是否高亮。
+
+
+class UserActivityItem(BaseModel):
+    """个人活动列表中的文章摘要。"""
+
+    id: int  # 文章 ID，前端用它生成 /posts/{id} 链接。
+    title: str  # 文章标题。
+    created_at: datetime  # 文章本身的发布时间。
+    activity_at: datetime  # 当前用户点赞、收藏或最近浏览这篇文章的时间。
+    view_count: int = Field(ge=0)  # 文章当前累计浏览量。
+
+
+class UserCommentActivityItem(BaseModel):
+    """个人评论历史，包含跳回原文章所需的最小信息。"""
+
+    id: int  # 评论 ID。
+    content: str  # 用户当时发表的评论正文。
+    created_at: datetime  # 评论发表时间。
+    post_id: int  # 所属文章 ID，用于点击后跳回文章详情。
+    post_title: str  # 所属文章标题，让列表无需再发一次请求就能展示上下文。

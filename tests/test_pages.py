@@ -46,6 +46,7 @@ async def test_page_router_renders_pages(
         f"/posts/{post_id}",
         f"/posts/{post_id}/edit",
         f"/profile/{user_id}",
+        "/me/activities",
     ]
 
     responses = [await client.get(route) for route in routes]
@@ -53,6 +54,12 @@ async def test_page_router_renders_pages(
     assert all(response.status_code == 200 for response in responses)
     assert "FastAPI page" in responses[1].text
     assert "author@example.com" in responses[7].text
+    assert "data-avatar-editor" in responses[7].text
+    assert "data-avatar-input" in responses[7].text
+    assert "data-profile-avatar-image" in responses[7].text
+    assert 'id="username"' in responses[7].text
+    assert "readonly" in responses[7].text
+    assert "data-activity-page" in responses[8].text
 
 
 async def test_home_lists_categories_and_filters_posts(
@@ -138,6 +145,12 @@ async def test_layout_has_authenticated_user_menu_and_password_modal(client: Asy
     assert '/admin"' in response.text
     assert 'id="passwordModal"' in response.text
     assert "data-password-form" in response.text
+    assert "?tab=comments" in response.text
+    assert "?tab=likes" in response.text
+    assert "?tab=favorites" in response.text
+    assert "?tab=views" in response.text
+    assert "user-footprint-link" not in response.text
+    assert "user-popover-link" in response.text
 
 
 async def test_admin_pages_use_separate_layout(client: AsyncClient) -> None:
@@ -168,6 +181,8 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert 'id="post-editor"' in editor.text
     assert 'name="category_id"' in editor.text
     assert "data-post-preview" in editor.text
+    assert "editor-preview-button" in editor.text
+    assert "btn-outline-primary" not in editor.text
     assert "admin-shell" in editor.text
     assert "admin-editor-shell" in editor.text
     assert "data-admin-content" in editor.text
@@ -177,3 +192,8 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert "toastui-editor-all.min.js" in viewer.text
     assert 'id="post-viewer"' in viewer.text
     assert "/static/js/posts.js" in viewer.text
+    assert "data-post-interactions" in viewer.text
+    assert "data-view-count" in viewer.text
+    assert "post-view-stat" in viewer.text
+    assert "post-view-stat" in (await client.get("/posts")).text
+    assert "/static/js/post-activities.js" in viewer.text

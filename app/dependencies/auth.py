@@ -14,6 +14,7 @@ from app.services.auth import touch_refresh_session, verify_access_token
 # FastAPI 从 Authorization: Bearer <token> Header 中提取字符串，并在缺失时自动返回
 # 401。tokenUrl 还会让 Swagger 的 Authorize 按钮知道登录接口在哪里。
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/oauth2-token")
+optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/oauth2-token", auto_error=False)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -70,3 +71,23 @@ async def require_admin(user: Annotated[User, Depends(get_current_user)]) -> Use
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_admin)]
+
+
+async def get_optional_current_user(
+    token: Annotated[str | None, Depends(optional_oauth2_scheme)], session: DbSession
+) -> User | None:
+    """有 Bearer Token 时验证用户，没有 Token 时返回 ``None``，供公开互动状态使用。"""
+
+    if token is None:
+        return None
+    try:
+        user_id = verify_access_token(token)
+    except (jwt.PyJWTError, TypeError, ValueError) as exc:
+        raise _credentials_error() from exc
+    user = await session.get(User, user_id)
+    if user is None:
+        raise _credentials_error()
+    return user
+
+
+OptionalCurrentUser = Annotated[User | None, Depends(get_optional_current_user)]

@@ -36,6 +36,10 @@
                     <a class="post-category" href="{{ url_for('posts') }}?category={{ post.category.slug | urlencode }}">
                         {{ post.category.name }}
                     </a>
+                    <span class="post-view-stat">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        {{ post.view_count }} 次浏览
+                    </span>
                 </div>
                 <h2><a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a></h2>
                 <p class="post-excerpt">{{ post.content | striptags | truncate(180, true, '…') }}</p>

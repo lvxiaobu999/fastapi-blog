@@ -55,9 +55,13 @@
             <div class="form-actions editor-actions">
                 <a class="btn btn-outline-secondary" href="{{ url_for('admin_posts') }}">取消</a>
                 <div class="editor-primary-actions">
-                    <button class="btn btn-outline-primary" type="button" data-post-preview
+                    <button class="btn editor-preview-button" type="button" data-post-preview
                             data-bs-toggle="modal" data-bs-target="#postPreviewModal">
-                        预览文章
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        <span>预览文章</span>
                     </button>
                     <button class="btn btn-primary px-4" type="submit">
                         {{ "保存修改" if post | default(none) else "发布文章" }}

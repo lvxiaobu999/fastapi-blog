@@ -7,7 +7,7 @@ Post 通过 ``user_id`` 外键保存作者身份，通过 ``author`` 关系属�
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -27,6 +27,8 @@ class Post(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(100), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # 总浏览量允许匿名访问累加；server_default 保证历史文章迁移后从 0 开始。
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
 
     # Python default 用于 ORM 新增；server_default 用于直接执行 INSERT。
     # timezone=True 表示业务层按带时区时间处理，Python 侧始终生成 UTC 时间。

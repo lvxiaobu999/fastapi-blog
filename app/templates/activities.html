@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="activity-page" data-activity-page>
+    <header class="activity-page-header">
+        <span class="eyebrow">PERSONAL</span>
+        <h1>我的活动</h1>
+    </header>
+    <nav class="activity-tabs" aria-label="活动类型">
+        <button type="button" data-activity-tab="comments">评论</button>
+        <button type="button" data-activity-tab="likes">赞过</button>
+        <button type="button" data-activity-tab="favorites">收藏</button>
+        <button type="button" data-activity-tab="views">我的足迹</button>
+    </nav>
+    <div class="activity-list" data-activity-list aria-live="polite"></div>
+    <p class="activity-empty d-none" data-activity-empty>这里暂时没有内容</p>
+</section>
+{% endblock content %}

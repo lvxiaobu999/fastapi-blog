@@ -83,13 +83,34 @@
                                 <div><strong data-current-user-nickname>用户</strong>
                                     <span data-current-user-handle>@user</span></div>
                             </div>
+                            <nav class="user-activity-shortcuts" aria-label="我的内容">
+                                <a href="{{ url_for('my_activities') }}?tab=comments">评论</a>
+                                <a href="{{ url_for('my_activities') }}?tab=likes">赞过</a>
+                                <a href="{{ url_for('my_activities') }}?tab=favorites">收藏</a>
+                            </nav>
                             <div class="user-popover-actions">
                                 <a class="user-popover-link d-none" href="{{ url_for('post_create') }}"
-                                   data-auth-admin>发布新帖子</a>
-                                <a class="user-popover-link" href="#" data-profile-link>编辑个人信息</a>
-                                <a class="user-popover-link d-none" href="{{ url_for('admin_dashboard') }}" data-auth-admin>进入我的后台</a>
+                                   data-auth-admin>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                    <span>发布新帖子</span>
+                                </a>
+                                <a class="user-popover-link" href="#" data-profile-link>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4Zm9-13 4 4"/></svg>
+                                    <span>编辑个人信息</span>
+                                </a>
+                                <a class="user-popover-link" href="{{ url_for('my_activities') }}?tab=views">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    <span>我的足迹</span>
+                                </a>
+                                <a class="user-popover-link d-none" href="{{ url_for('admin_dashboard') }}" data-auth-admin>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V8l8-5 8 5v12H4Zm5 0v-6h6v6"/></svg>
+                                    <span>进入我的后台</span>
+                                </a>
                                 <button class="user-popover-link" type="button" data-bs-toggle="modal"
-                                        data-bs-target="#passwordModal">修改密码</button>
+                                        data-bs-target="#passwordModal">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>
+                                    <span>修改密码</span>
+                                </button>
                             </div>
                             <button class="user-popover-logout" type="button" data-logout>退出登录</button>
                         </div>
@@ -204,6 +225,7 @@
     <script type="module" src="{{ url_for('static', path='js/auth.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/search.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/posts.js') }}"></script>
+    <script type="module" src="{{ url_for('static', path='js/post-activities.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/forms.js') }}"></script>
     {% block scripts %}{% endblock scripts %}
 </body>

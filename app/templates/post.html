@@ -18,10 +18,24 @@
                 <div class="post-meta">
                     <span class="post-author">{{ post.author.nickname }}</span>
                     <time datetime="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime("%Y-%m-%d %H:%M") }}</time>
+                    <span class="post-view-stat">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <span data-view-count>{{ post.view_count }}</span> 次浏览
+                    </span>
                 </div>
                 <h1>{{ post.title }}</h1>
                 <div class="post-content" id="post-viewer"></div>
                 <textarea class="d-none" id="post-markdown">{{ post.content }}</textarea>
+                <div class="post-interactions" data-post-interactions data-post-id="{{ post.id }}">
+                    <button class="post-interaction-button" type="button" data-like-post aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v11H3V10h4Zm4 11a2 2 0 0 1-2-2v-8l4-8 1 1v5h5a2 2 0 0 1 2 2l-2 8a2 2 0 0 1-2 2h-6Z"/></svg>
+                        <span>点赞</span><span data-like-count>0</span>
+                    </button>
+                    <button class="post-interaction-button" type="button" data-favorite-post aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3Z"/></svg>
+                        <span>收藏</span><span data-favorite-count>0</span>
+                    </button>
+                </div>
             </div>
         </article>
 

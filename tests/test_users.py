@@ -69,7 +69,7 @@ async def test_create_rejects_duplicate_identity(client: AsyncClient) -> None:
     ).status_code == 409
 
 
-async def test_update_user_and_password(
+async def test_user_can_only_update_nickname_and_email(
     client: AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -78,21 +78,35 @@ async def test_update_user_and_password(
     response = await client.patch(
         f"/api/users/{user_id}",
         json={
-            "username": "UpdatedAlice",
             "nickname": "Alice",
             "email": "NEW@example.com",
-            "password": "newpassword123",
         },
         headers=auth_headers(user_id),
     )
 
     assert response.status_code == 200
-    assert response.json()["data"]["username"] == "updatedalice"
+    assert response.json()["data"]["username"] == "alice"
+    assert response.json()["data"]["nickname"] == "Alice"
     assert response.json()["data"]["email"] == "new@example.com"
     async with session_factory() as session:
         stored_user = await session.get(User, user_id)
         assert stored_user is not None
-        assert await verify_password("newpassword123", stored_user.hashed_password)
+        assert await verify_password("password123", stored_user.hashed_password)
+
+
+@pytest.mark.parametrize("field,value", [("username", "renamed"), ("password", "newpassword123"), ("image_file", "avatar.png")])
+async def test_profile_update_rejects_fields_with_dedicated_management(
+    client: AsyncClient, field: str, value: str
+) -> None:
+    """普通资料接口不能绕过后台、改密或头像上传流程修改专用字段。"""
+
+    user_id = (await create_user(client)).json()["data"]["id"]
+
+    response = await client.patch(
+        f"/api/users/{user_id}", json={field: value}, headers=auth_headers(user_id)
+    )
+
+    assert response.status_code == 422
 
 
 async def test_delete_missing_and_validation_paths(client: AsyncClient) -> None:

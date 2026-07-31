@@ -3,13 +3,21 @@
 <div class="row g-4">
     <aside class="col-lg-4">
         <section class="profile-summary" aria-labelledby="profile-name">
-            <div class="profile-avatar" aria-hidden="true">
-                {% if user.image_file %}
-                <img src="{{ user.image_path }}" alt="">
-                {% else %}
-                {{ user.username[0] | upper }}
-                {% endif %}
-            </div>
+            <label class="profile-avatar-editor" data-avatar-editor>
+                <img src="{{ user.image_path }}" alt="{{ user.nickname }}的头像"
+                     data-profile-avatar-image>
+                <span class="profile-avatar-overlay">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 8h4l2-3h4l2 3h4v11H4V8Z"/>
+                        <circle cx="12" cy="13" r="3.5"/>
+                    </svg>
+                    <span data-avatar-action-text>修改头像</span>
+                </span>
+                <input class="visually-hidden" name="avatar" type="file"
+                       accept="image/png,image/jpeg,image/gif,image/webp"
+                       data-avatar-input aria-label="选择新头像">
+            </label>
+            <p class="profile-avatar-feedback" data-avatar-feedback aria-live="polite"></p>
             <span class="role-badge">{{ "管理员" if user.is_admin else "普通用户" }}</span>
             <h1 id="profile-name">{{ user.nickname }}</h1>
             <p>@{{ user.username }}</p>
@@ -41,19 +49,14 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="username">用户名</label>
-                        <input class="form-control" id="username" name="username" type="text"
-                               maxlength="50" required value="{{ user.username }}">
+                        <input class="form-control profile-readonly-field" id="username" type="text"
+                               readonly aria-readonly="true" value="{{ user.username }}">
+                        <div class="form-text">用户名是登录标识，不支持自行修改。</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label" for="email">邮箱</label>
                         <input class="form-control" id="email" name="email" type="email"
                                maxlength="254" required value="{{ user.email }}">
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label" for="avatar">更换头像</label>
-                        <input class="form-control" id="avatar" name="avatar" type="file"
-                               accept="image/png,image/jpeg,image/webp">
-                        <div class="form-text">支持 PNG、JPEG、WebP；文件大小限制由后端校验。</div>
                     </div>
                 </div>
                 <div class="form-actions">
