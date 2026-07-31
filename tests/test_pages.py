@@ -68,9 +68,9 @@ async def test_home_lists_categories_and_filters_posts(
     assert 'aria-label="文章分类"' in all_posts.text
     assert "FastAPI" in all_posts.text
     assert "Python" in all_posts.text
-    assert f'/posts/{post_id}' in fastapi_posts.text
+    assert f"/posts/{post_id}" in fastapi_posts.text
     assert "FastAPI文章" in fastapi_posts.text
-    assert f'/posts/{post_id}' not in python_posts.text
+    assert f"/posts/{post_id}" not in python_posts.text
 
 
 async def test_page_router_returns_html_404(client: AsyncClient) -> None:
@@ -109,6 +109,17 @@ async def test_layout_uses_global_debounced_search_modal(client: AsyncClient) ->
     assert "pendingRequest?.abort()" in search_script.text
 
 
+async def test_layout_includes_loading_and_session_scripts(client: AsyncClient) -> None:
+    response = await client.get("/")
+    ui_script = await client.get("/static/js/ui.js")
+
+    assert response.status_code == 200
+    assert "/static/js/auth.js" in response.text
+    assert ui_script.status_code == 200
+    assert "setButtonLoading" in ui_script.text
+    assert "dataset.authState" in response.text
+
+
 async def test_post_pages_include_rich_editor_and_markdown_viewer(
     client: AsyncClient, seeded_ids: tuple[int, int]
 ) -> None:
@@ -122,6 +133,8 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert 'id="post-editor"' in editor.text
     assert 'name="category_id"' in editor.text
     assert "data-post-preview" in editor.text
+    assert "data-require-admin" in editor.text
+    assert "data-admin-denied" in editor.text
     assert 'id="post-preview-viewer"' in editor.text
     assert "toastui-editor-all.min.js" in viewer.text
     assert 'id="post-viewer"' in viewer.text

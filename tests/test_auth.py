@@ -106,6 +106,19 @@ async def test_refresh_rotates_cookie_and_logout_clears_it(client: AsyncClient) 
     assert logout.json()["data"] is None
 
 
+async def test_current_session_requires_a_valid_access_token(client: AsyncClient) -> None:
+    """前端启动时使用该接口确认缓存 Token 仍然对应有效用户。"""
+
+    user = await register(client)
+    token = (await login(client)).json()["data"]["access_token"]
+    valid = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    invalid = await client.get("/api/auth/me", headers={"Authorization": "Bearer not-a-jwt"})
+
+    assert valid.status_code == 200
+    assert valid.json()["data"]["id"] == user["id"]
+    assert invalid.status_code == 401
+
+
 async def test_create_post_requires_valid_admin_token(
     client: AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],
@@ -128,12 +141,15 @@ async def test_create_post_requires_valid_admin_token(
         assert stored_user is not None
         stored_user.is_admin = True
         await session.commit()
+    current = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     admin = await client.post(
         "/api/posts", json=payload, headers={"Authorization": f"Bearer {token}"}
     )
 
     assert missing.status_code == 401
     assert regular.status_code == 403
+    assert current.status_code == 200
+    assert current.json()["data"]["is_admin"] is True
     assert admin.status_code == 201
     assert admin.json()["data"]["user_id"] == user["id"]
 

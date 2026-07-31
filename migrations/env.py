@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core import get_settings
 from app.db.base import Base
-from app.models import Category, Post, RefreshSession, User  # noqa: F401  # 注册全部模型到 Base.metadata。
+from app.models import Category, Comment, Post, RefreshSession, User  # noqa: F401  # 注册全部模型到 Base.metadata。
 
 config = context.config
 if config.config_file_name is not None:

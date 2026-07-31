@@ -24,10 +24,34 @@
                 <textarea class="d-none" id="post-markdown">{{ post.content }}</textarea>
             </div>
         </article>
+
+        <section class="comments-section" data-comments data-post-id="{{ post.id }}"
+                 aria-labelledby="comments-title">
+            <header class="comments-heading">
+                <div><span class="eyebrow">DISCUSSION</span><h2 id="comments-title">评论</h2></div>
+                <span class="comment-count" data-comment-count>0 条</span>
+            </header>
+            <div class="comment-list" data-comment-list aria-live="polite"></div>
+            <p class="comment-empty" data-comment-empty>还没有评论，来分享你的想法吧。</p>
+            <form class="comment-form" data-comment-form>
+                <label class="form-label" for="comment-content">发表评论</label>
+                <div class="comment-replying d-none" data-comment-replying>
+                    <span>回复 <strong data-reply-name></strong></span>
+                    <button type="button" class="btn comment-reply-cancel" data-reply-cancel>取消</button>
+                </div>
+                <textarea class="form-control" id="comment-content" name="content" rows="3"
+                          maxlength="1000" placeholder="写下你的想法…" required></textarea>
+                <div class="comment-form-footer">
+                    <span class="comment-status" data-comment-status aria-live="polite">连接中…</span>
+                    <button class="btn btn-primary" type="submit" disabled data-comment-submit>发送评论</button>
+                </div>
+            </form>
+        </section>
     </div>
 </div>
 {% endblock content %}
 {% block scripts %}
 <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
 <script src="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight-all.min.js"></script>
+<script type="module" src="{{ url_for('static', path='js/comments.js') }}"></script>
 {% endblock scripts %}

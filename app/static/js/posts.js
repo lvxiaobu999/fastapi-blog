@@ -1,9 +1,15 @@
-/** 帖子写入表单；公共 AJAX 封装会自动附加当前会话的 Bearer Token。 */
+/**
+ * 帖子详情渲染、编辑器、预览和发布入口。
+ *
+ * 同一脚本会加载到帖子详情页和编辑页，因此每一段都先检查目标 DOM 是否存在：
+ * 详情页初始化只读 Viewer；编辑页初始化 Editor、图片上传、预览与提交逻辑。
+ */
 
 import {ajaxRequest, errorMessages, uploadFile} from "./api.js";
 import {setButtonLoading} from "./ui.js";
 
 function decorateCodeBlocks(root) {
+    // Toast UI 已经完成 Markdown 渲染；这里只读取语言 class 并添加视觉标签。
     root.querySelectorAll("pre").forEach((pre) => {
         const code = pre.querySelector("code");
         if (!code) {
@@ -21,10 +27,12 @@ function decorateCodeBlocks(root) {
 }
 
 $(function () {
+    // ---------- 详情页：把隐藏 textarea 中的 Markdown 渲染为只读正文 ----------
     const viewerElement = document.querySelector("#post-viewer");
     const viewerSource = document.querySelector("#post-markdown");
     if (viewerElement && viewerSource) {
         const initializeViewer = () => {
+            // CDN 脚本可能尚未加载完成，用返回值告诉外层是否需要稍后重试。
             if (!window.toastui?.Editor?.factory) {
                 return false;
             }
@@ -58,6 +66,7 @@ $(function () {
 
     let editor = null;
     let previewViewer = null;
+    // ---------- 编辑页：创建 Toast UI Editor，并把图片交给后端上传 ----------
     const editorElement = document.querySelector("#post-editor");
     if (editorElement && window.toastui?.Editor) {
         const source = document.querySelector("#content");
@@ -74,6 +83,7 @@ $(function () {
             plugins: codeSyntaxHighlight ? [codeSyntaxHighlight] : [],
             hooks: {
                 addImageBlobHook(blob, callback) {
+                    // 上传成功后 callback 把服务端 URL 插回 Markdown；失败不插入占位图。
                     uploadFile("/api/posts/images", "image", blob)
                         .done((result) => callback(result.url, blob.name || "文章图片"))
                         .fail((xhr) => window.alert(errorMessages(xhr)));
@@ -83,6 +93,7 @@ $(function () {
     }
 
     $("[data-post-preview]").on("click", function () {
+        // ---------- 预览：读取编辑器当前值，不保存、不调用帖子写入 API ----------
         const title = $("[data-post-form] [name=title]").val().trim() || "未命名文章";
         const markdown = editor
             ? editor.getMarkdown()
@@ -124,6 +135,7 @@ $(function () {
     });
 
     $("[data-post-form]").on("submit", function (event) {
+        // ---------- 保存：是否存在 postId 决定创建 POST 还是更新 PATCH ----------
         event.preventDefault();
         const $form = $(this);
         const postId = $form.data("post-id");
@@ -139,8 +151,10 @@ $(function () {
                 content: editor ? editor.getMarkdown() : $form.find("[name=content]").val(),
             },
         }).done((post) => {
+            // 服务端返回最终 ID 后进入详情页；页面重载会初始化只读 Viewer。
             window.location.assign(`/posts/${post.id}`);
         }).fail((xhr) => {
+            // 失败时必须解除按钮锁，让用户修改内容后可以再次提交。
             setButtonLoading(button, false);
             $form.find("[data-form-feedback]")
                 .removeClass("d-none")

@@ -9,7 +9,13 @@ from fastapi.staticfiles import StaticFiles
 from app.core import get_settings
 from app.db.session import engine
 from app.exception_handlers import register_exception_handlers
-from app.routers import api_auth_router, api_posts_router, api_users_router, pages_router
+from app.routers import (
+    api_auth_router,
+    api_posts_router,
+    api_users_router,
+    comments_router,
+    pages_router,
+)
 from app.templating import APP_DIR
 
 settings = get_settings()
@@ -36,10 +42,12 @@ async def add_request_id(request: Request, call_next: RequestResponseEndpoint) -
     response.headers["X-Request-ID"] = str(request.state.request_id)
     return response
 
+
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 app.mount("/media", StaticFiles(directory=APP_DIR / "media"), name="media")
 app.include_router(pages_router)
 app.include_router(api_auth_router)
 app.include_router(api_posts_router)
+app.include_router(comments_router)
 app.include_router(api_users_router)
 register_exception_handlers(app)

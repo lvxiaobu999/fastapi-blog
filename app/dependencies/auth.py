@@ -63,11 +63,6 @@ async def require_admin(user: Annotated[User, Depends(get_current_user)]) -> Use
     身份有效但 ``is_admin`` 为 False 返回 403。管理员标记来自数据库，不接受前端提交。
     """
 
-    # for key, value in vars(user).items():
-    #     if key.startswith("_"):  # 去掉 SQLAlchemy 内部属性
-    #         continue
-    #     print(f"哈哈----{key} --> {value}")
-
     if not user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user

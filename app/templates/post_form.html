@@ -4,7 +4,14 @@
 <link rel="stylesheet" href="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight.min.css">
 {% endblock head %}
 {% block content %}
-<div class="editor-shell">
+<div class="error-panel" data-admin-denied hidden>
+    <div class="error-code">403</div>
+    <h1>需要管理员权限</h1>
+    <p>当前登录用户没有发布或编辑文章的权限，请切换管理员账号。</p>
+    <a class="btn btn-primary" href="{{ url_for('home') }}">返回首页</a>
+</div>
+
+<div class="editor-shell" data-require-admin hidden>
     <section class="editor-panel" aria-labelledby="editor-title">
         <div class="section-heading editor-heading">
             <div>

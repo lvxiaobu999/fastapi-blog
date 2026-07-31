@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     # 仅供类型检查器识别，不在运行时导入，避免 Post 与 User 互相导入。
     from app.models.user import User
     from app.models.category import Category
+    from app.models.comment import Comment
 
 
 class Post(Base):
@@ -55,3 +56,6 @@ class Post(Base):
     # back_populates 与 User.posts 成对出现，修改任意一侧时 ORM 能同步关系状态。
     author: Mapped["User"] = relationship(back_populates="posts")
     category: Mapped["Category"] = relationship(back_populates="posts")
+    comments: Mapped[list["Comment"]] = relationship(
+        back_populates="post", cascade="all, delete-orphan", passive_deletes=True
+    )
