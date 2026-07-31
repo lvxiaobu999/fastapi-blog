@@ -13,6 +13,7 @@ from app.templating import APP_DIR
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 POST_IMAGE_DIR = APP_DIR / "media" / "post_images"
+PROFILE_IMAGE_DIR = APP_DIR / "media" / "profile_pics"
 
 
 class InvalidImageError(ValueError):
@@ -57,3 +58,24 @@ async def save_post_image(upload: UploadFile) -> str:
 
     await to_thread.run_sync(write_image)
     return f"/media/post_images/{filename}"
+
+
+async def save_profile_image(upload: UploadFile) -> str:
+    """校验并保存用户头像，返回应写入 ``User.image_file`` 的随机文件名。"""
+
+    content = await upload.read(MAX_IMAGE_BYTES + 1)
+    if len(content) > MAX_IMAGE_BYTES:
+        raise InvalidImageError("Image must not exceed 5 MB")
+    extension = _detect_extension(content)
+    if extension is None:
+        raise InvalidImageError("Only PNG, JPEG, GIF and WebP images are allowed")
+
+    filename = f"{uuid4().hex}{extension}"
+    target = PROFILE_IMAGE_DIR / filename
+
+    def write_image() -> None:
+        PROFILE_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+
+    await to_thread.run_sync(write_image)
+    return filename

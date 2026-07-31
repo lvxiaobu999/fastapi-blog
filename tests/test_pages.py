@@ -120,6 +120,41 @@ async def test_layout_includes_loading_and_session_scripts(client: AsyncClient) 
     assert "dataset.authState" in response.text
 
 
+async def test_layout_has_authenticated_user_menu_and_password_modal(client: AsyncClient) -> None:
+    """登录导航提供头像菜单、资料入口、管理员入口和改密模态框。"""
+
+    response = await client.get("/")
+
+    assert response.status_code == 200
+    assert "data-current-user-avatar" in response.text
+    assert "data-profile-link" in response.text
+    assert "发布新帖子" in response.text
+    assert "user-popover-publish" not in response.text
+    assert response.text.index("data-theme-toggle") < response.text.index("user-avatar-trigger")
+    assert "theme-icon-moon" in response.text
+    assert "theme-icon-sun" in response.text
+    assert "theme-option" not in response.text
+    assert 'data-auth-admin' in response.text
+    assert '/admin"' in response.text
+    assert 'id="passwordModal"' in response.text
+    assert "data-password-form" in response.text
+
+
+async def test_admin_pages_use_separate_layout(client: AsyncClient) -> None:
+    """后台页面共享独立侧栏布局，并加载后台专用脚本。"""
+
+    dashboard, users, posts = await client.get("/admin"), await client.get("/admin/users"), await client.get("/admin/posts")
+
+    assert dashboard.status_code == users.status_code == posts.status_code == 200
+    assert "admin-shell" in dashboard.text
+    assert "用户管理" in users.text
+    assert "帖子管理" in posts.text
+    assert "/static/js/admin.js" in dashboard.text
+    assert "admin-theme-toggle" in dashboard.text
+    assert "/static/js/theme.js" in dashboard.text
+    assert "theme-option" not in dashboard.text
+
+
 async def test_post_pages_include_rich_editor_and_markdown_viewer(
     client: AsyncClient, seeded_ids: tuple[int, int]
 ) -> None:
@@ -133,9 +168,12 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert 'id="post-editor"' in editor.text
     assert 'name="category_id"' in editor.text
     assert "data-post-preview" in editor.text
-    assert "data-require-admin" in editor.text
-    assert "data-admin-denied" in editor.text
+    assert "admin-shell" in editor.text
+    assert "admin-editor-shell" in editor.text
+    assert "data-admin-content" in editor.text
     assert 'id="post-preview-viewer"' in editor.text
+    assert "/static/js/admin.js" in editor.text
+    assert "/static/js/posts.js" in editor.text
     assert "toastui-editor-all.min.js" in viewer.text
     assert 'id="post-viewer"' in viewer.text
     assert "/static/js/posts.js" in viewer.text

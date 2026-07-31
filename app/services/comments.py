@@ -1,6 +1,6 @@
 """评论查询与写入服务；不处理 HTTP/WebSocket 连接或广播。"""
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -55,6 +55,8 @@ async def create_comment(
         parent_id=parent.id if parent else None,
         root_id=root_id,
     )
+
+    print({k: v for k, v in comment.__dict__.items() if not k.startswith("_")})
     session.add(comment)
     try:
         # 第五步：必须先提交数据库，再允许 WebSocket Router 广播。否则提交失败时，
@@ -69,6 +71,7 @@ async def create_comment(
             )
             .where(Comment.id == comment.id)
         )
+        print({k: v for k, v in comment.__dict__.items() if not k.startswith("_")})
     except Exception:
         # 已处理的写入异常必须回滚，避免这个 Session 停留在失败事务中。
         await session.rollback()

@@ -5,7 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import User
 from app.schemas import UserCreate, UserUpdate
-from app.services.auth import hash_password
+from app.schemas.user import AdminUserCreate, AdminUserUpdate
+from app.services.auth import hash_password, verify_password
 
 
 class UserAlreadyExistsError(Exception):
@@ -139,3 +140,51 @@ async def delete_user(session: AsyncSession, user: User) -> None:
 
     await session.delete(user)
     await session.commit()
+
+
+async def create_admin_managed_user(session: AsyncSession, data: AdminUserCreate) -> User:
+    """由管理员创建普通或管理员用户，并可设置初始昵称。"""
+
+    user = await create_user(session, UserCreate.model_validate(data.model_dump()), is_admin=data.is_admin)
+    if data.nickname:
+        user.nickname = data.nickname.strip()
+        await session.commit()
+        await session.refresh(user)
+    return user
+
+
+async def update_admin_managed_user(
+    session: AsyncSession, user: User, data: AdminUserUpdate
+) -> User:
+    """复用资料更新规则，并单独处理只有管理员能够改变的角色。"""
+
+    profile_data = UserUpdate.model_validate(
+        data.model_dump(exclude={"is_admin"}, exclude_unset=True)
+    )
+    user = await update_user(session, user, profile_data)
+    if data.is_admin is not None and user.is_admin != data.is_admin:
+        user.is_admin = data.is_admin
+        await session.commit()
+        await session.refresh(user)
+    return user
+
+
+async def set_profile_image(session: AsyncSession, user: User, filename: str) -> User:
+    """保存头像文件名；文件内容已经由图片服务校验并写入磁盘。"""
+
+    user.image_file = filename
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def change_password(
+    session: AsyncSession, user: User, current_password: str, new_password: str
+) -> bool:
+    """验证旧密码后写入新哈希；旧密码错误时不修改数据库并返回 False。"""
+
+    if not await verify_password(current_password, user.hashed_password):
+        return False
+    user.hashed_password = await hash_password(new_password)
+    await session.commit()
+    return True

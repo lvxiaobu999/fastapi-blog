@@ -117,3 +117,24 @@ async def post_detail(request: Request, post_id: int, session: DbSession):
         "post.html",
         {"post": post, "title": post.title},
     )
+
+
+@router.get("/admin", name="admin_dashboard")
+async def admin_dashboard(request: Request):
+    """渲染后台首页外壳；管理员身份由前端启动校验和 API 双重确认。"""
+
+    return templates.TemplateResponse(request, "admin/dashboard.html", {"title": "后台概览"})
+
+
+@router.get("/admin/users", name="admin_users")
+async def admin_users(request: Request):
+    """渲染用户管理工作区，数据由管理员 API 加载。"""
+
+    return templates.TemplateResponse(request, "admin/users.html", {"title": "用户管理"})
+
+
+@router.get("/admin/posts", name="admin_posts")
+async def admin_posts(request: Request):
+    """渲染帖子管理工作区，数据由帖子 API 加载。"""
+
+    return templates.TemplateResponse(request, "admin/posts.html", {"title": "帖子管理"})

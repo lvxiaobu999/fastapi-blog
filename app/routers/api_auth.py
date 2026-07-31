@@ -9,11 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api_responses import API_ERROR_RESPONSES, success_response
 from app.core import get_settings
 from app.db.session import get_db
-from app.schemas.auth import TokenResponse
+from app.schemas.auth import PasswordChangeRequest, TokenResponse
 from app.schemas.api import ApiSuccess
 from app.schemas.user import UserResponse
 from app.dependencies.auth import CurrentUser
 from app.services import auth as auth_service
+from app.services import users as user_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"], responses=API_ERROR_RESPONSES)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
@@ -122,3 +123,19 @@ async def current_session(request: Request, current_user: CurrentUser) -> ApiSuc
     """验证当前 Access Token，并返回导航会话所需的当前用户。"""
 
     return success_response(request, UserResponse.model_validate(current_user))
+
+
+@router.post("/password", response_model=ApiSuccess[None])
+async def change_password(
+    request: Request,
+    data: PasswordChangeRequest,
+    session: DbSession,
+    current_user: CurrentUser,
+) -> ApiSuccess[None]:
+    """验证当前密码后修改密码；旧密码错误返回 400。"""
+
+    if not await user_service.change_password(
+        session, current_user, data.current_password, data.new_password
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    return success_response(request, None)

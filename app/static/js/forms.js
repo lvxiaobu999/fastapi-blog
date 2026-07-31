@@ -5,7 +5,7 @@
  * 使用 document 委托监听，是为了搜索结果替换 main 后，新插入的表单仍能响应。
  */
 
-import {ajaxRequest, errorMessages} from "./api.js";
+import {ajaxRequest, errorMessages, uploadFile} from "./api.js";
 import {setButtonLoading} from "./ui.js";
 
 $(document).on("submit", "[data-search-form]", function (event) {
@@ -28,14 +28,7 @@ $(document).on("submit", "[data-search-form]", function (event) {
 $(document).on("submit", "[data-profile-form]", function (event) {
     event.preventDefault();
     const $form = $(this);
-    if ($form.find("[name=avatar]")[0].files.length) {
-        // 当前后端没有头像上传契约，提前阻止保存可避免用户误以为文件已上传。
-        $form.find("[data-form-feedback]")
-            .removeClass("d-none alert-success")
-            .addClass("alert-danger")
-            .text("头像上传接口尚未实现，请先清空头像文件后保存其他资料。");
-        return;
-    }
+    const avatar = $form.find("[name=avatar]")[0].files[0];
     const button = $form.find("[type=submit]")[0];
     if (!setButtonLoading(button, true, "保存中…")) return;
     ajaxRequest({
@@ -47,8 +40,13 @@ $(document).on("submit", "[data-profile-form]", function (event) {
             username: $form.find("[name=username]").val(),
             email: $form.find("[name=email]").val(),
         },
+    }).then(() => {
+        // then() 会接管返回的上传 Promise；只有资料和头像都成功才进入后面的 done()。
+        if (avatar) {
+            return uploadFile("/api/users/me/avatar", "avatar", avatar);
+        }
+        return null;
     }).done(() => {
-        // PATCH 成功后页面字段无需重载，仅在表单内给出结果反馈。
         $form.find("[data-form-feedback]")
             .removeClass("d-none alert-danger")
             .addClass("alert-success")

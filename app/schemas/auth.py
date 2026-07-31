@@ -1,6 +1,22 @@
 """JWT 认证接口契约；只描述登录响应，不暴露 Token 内部或用户敏感字段。"""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
+
+
+class PasswordChangeRequest(BaseModel):
+    """当前用户修改密码时提交的旧密码与两次新密码。"""
+
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "PasswordChangeRequest":
+        """在进入 Service 前拒绝两次输入不一致的新密码。"""
+
+        if self.new_password != self.confirm_password:
+            raise ValueError("New passwords do not match")
+        return self
 
 
 class TokenResponse(BaseModel):

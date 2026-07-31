@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI Blog - {{ title }}</title>
+    <script>
+        (() => {
+            const saved = localStorage.getItem("blog-theme") || "auto";
+            const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.setAttribute("data-bs-theme", saved === "auto" ? (dark ? "dark" : "light") : saved);
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
+    {% block head %}{% endblock head %}
+</head>
+<body class="admin-body" data-admin-page="{% block page_id %}{% endblock %}">
+<div class="admin-shell">
+    <aside class="admin-sidebar">
+        <a class="admin-brand" href="{{ url_for('admin_dashboard') }}"><span class="brand-mark">F</span><span>内容后台</span></a>
+        <nav class="admin-nav" aria-label="后台导航">
+            <a href="{{ url_for('admin_dashboard') }}" data-admin-nav="dashboard">概览</a>
+            <a href="{{ url_for('admin_users') }}" data-admin-nav="users">用户管理</a>
+            <a href="{{ url_for('admin_posts') }}" data-admin-nav="posts">帖子管理</a>
+        </nav>
+        <a class="admin-return" href="{{ url_for('home') }}">返回博客</a>
+    </aside>
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <button class="admin-menu-toggle" type="button" data-admin-menu aria-label="展开后台导航">☰</button>
+            <div class="admin-topbar-heading"><strong>{{ title }}</strong><span data-admin-identity>正在验证管理员身份…</span></div>
+            <button class="theme-toggle-button admin-theme-toggle" type="button"
+                    data-theme-toggle title="切换到深色主题" aria-label="切换到深色主题">
+                <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.6 8.6 0 1 0 20.4 15.2Z"/>
+                </svg>
+                <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3.5"/>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/>
+                </svg>
+            </button>
+            <img src="/static/images/default.jpg" alt="" data-admin-avatar>
+        </header>
+        <main class="admin-content" hidden data-admin-content>{% block content %}{% endblock %}</main>
+        <section class="admin-access-state" data-admin-state>正在验证访问权限…</section>
+    </div>
+</div>
+<script src="{{ url_for('static', path='js/jquery-4.0.0.min.js') }}"></script>
+<script src="{{ url_for('static', path='js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', path='js/theme.js') }}"></script>
+<script type="module" src="{{ url_for('static', path='js/admin.js') }}"></script>
+{% block scripts %}{% endblock scripts %}
+</body>
+</html>

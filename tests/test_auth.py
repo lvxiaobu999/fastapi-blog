@@ -211,3 +211,34 @@ async def test_post_image_rejects_regular_user_and_fake_image(client: AsyncClien
 
     assert user["is_admin"] is False
     assert regular.status_code == 403
+
+
+async def test_change_password_requires_current_password(client: AsyncClient) -> None:
+    """修改密码必须验证旧密码，成功后新密码可以用于登录。"""
+
+    await register(client)
+    token = (await login(client)).json()["data"]["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    wrong = await client.post(
+        "/api/auth/password",
+        headers=headers,
+        json={
+            "current_password": "wrong-password",
+            "new_password": "newpassword123",
+            "confirm_password": "newpassword123",
+        },
+    )
+    changed = await client.post(
+        "/api/auth/password",
+        headers=headers,
+        json={
+            "current_password": "password123",
+            "new_password": "newpassword123",
+            "confirm_password": "newpassword123",
+        },
+    )
+
+    assert wrong.status_code == 400
+    assert changed.status_code == 200
+    assert (await login(client, password="password123")).status_code == 401
+    assert (await login(client, password="newpassword123")).status_code == 200

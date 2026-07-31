@@ -62,20 +62,37 @@
                             data-bs-toggle="modal" data-bs-target="#loginModal">登录</button>
                     <button class="btn btn-light" type="button" data-auth-guest
                             data-bs-toggle="modal" data-bs-target="#registerModal">注册</button>
-                    <a class="btn btn-light d-none" href="{{ url_for('post_create') }}" data-auth-admin>发布帖子</a>
-                    <button class="btn btn-outline-light d-none" type="button" data-auth-user data-logout>退出</button>
-                    <div class="dropdown">
-                        <button class="btn theme-toggle dropdown-toggle" type="button"
-                                data-bs-toggle="dropdown" aria-expanded="false"
-                                aria-label="选择页面主题">
-                            <span id="themeIcon" aria-hidden="true">◐</span>
-                            <span id="themeLabel">Auto</span>
+                    <button class="theme-toggle-button theme-toggle-on-nav" type="button"
+                            data-theme-toggle title="切换到深色主题" aria-label="切换到深色主题">
+                        <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.6 8.6 0 1 0 20.4 15.2Z"/>
+                        </svg>
+                        <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3.5"/>
+                            <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/>
+                        </svg>
+                    </button>
+                    <div class="dropdown user-menu d-none" data-auth-user>
+                        <button class="user-avatar-trigger" type="button" data-bs-toggle="dropdown"
+                                aria-expanded="false" aria-label="打开用户菜单">
+                            <img src="/static/images/default.jpg" alt="" data-current-user-avatar>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><button class="dropdown-item theme-option" data-theme="light" type="button">☀ Light</button></li>
-                            <li><button class="dropdown-item theme-option" data-theme="dark" type="button">☾ Dark</button></li>
-                            <li><button class="dropdown-item theme-option" data-theme="auto" type="button">◐ Auto</button></li>
-                        </ul>
+                        <div class="dropdown-menu dropdown-menu-end user-popover">
+                            <div class="user-popover-header">
+                                <img src="/static/images/default.jpg" alt="" data-current-user-avatar>
+                                <div><strong data-current-user-nickname>用户</strong>
+                                    <span data-current-user-handle>@user</span></div>
+                            </div>
+                            <div class="user-popover-actions">
+                                <a class="user-popover-link d-none" href="{{ url_for('post_create') }}"
+                                   data-auth-admin>发布新帖子</a>
+                                <a class="user-popover-link" href="#" data-profile-link>编辑个人信息</a>
+                                <a class="user-popover-link d-none" href="{{ url_for('admin_dashboard') }}" data-auth-admin>进入我的后台</a>
+                                <button class="user-popover-link" type="button" data-bs-toggle="modal"
+                                        data-bs-target="#passwordModal">修改密码</button>
+                            </div>
+                            <button class="user-popover-logout" type="button" data-logout>退出登录</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -157,6 +174,26 @@
                 <div><label class="form-label" for="modal-register-confirm">确认密码</label>
                     <input class="form-control" id="modal-register-confirm" name="password_confirm" type="password" minlength="8" maxlength="128" required></div>
                 <button class="btn btn-primary" type="submit">注册账号</button>
+            </form>
+        </div></div>
+    </div>
+
+    <div class="modal fade" id="passwordModal" tabindex="-1" aria-labelledby="passwordModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <div class="modal-header"><h2 class="modal-title fs-5" id="passwordModalTitle">修改密码</h2>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+            <form class="modal-body stacked-form" data-password-form>
+                <div class="alert d-none" role="alert" data-form-feedback></div>
+                <div><label class="form-label" for="current-password">当前密码</label>
+                    <input class="form-control" id="current-password" name="current_password"
+                           type="password" autocomplete="current-password" required></div>
+                <div><label class="form-label" for="new-password">新密码</label>
+                    <input class="form-control" id="new-password" name="new_password" type="password"
+                           minlength="8" maxlength="128" autocomplete="new-password" required></div>
+                <div><label class="form-label" for="confirm-password">确认新密码</label>
+                    <input class="form-control" id="confirm-password" name="confirm_password" type="password"
+                           minlength="8" maxlength="128" autocomplete="new-password" required></div>
+                <button class="btn btn-primary" type="submit">确认修改</button>
             </form>
         </div></div>
     </div>

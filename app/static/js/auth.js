@@ -43,6 +43,17 @@ $(function () {
         // /auth/me 才是可信状态来源；缓存 Token 只用于避免首屏导航闪烁。
         setAuthState(true);
         setAdminState(user.is_admin);
+        // 用户菜单由 /auth/me 的可信响应填充，不能从 localStorage 猜测昵称或头像。
+        document.querySelectorAll("[data-current-user-avatar]").forEach((image) => {
+            image.src = user.image_path;
+            image.alt = `${user.nickname}的头像`;
+        });
+        document.querySelectorAll("[data-current-user-nickname]")
+            .forEach((element) => { element.textContent = user.nickname; });
+        document.querySelectorAll("[data-current-user-handle]")
+            .forEach((element) => { element.textContent = `@${user.username}`; });
+        document.querySelectorAll("[data-profile-link]")
+            .forEach((link) => { link.href = `/profile/${user.id}`; });
         if (!adminContent) return;
         adminContent.hidden = !user.is_admin;
         if (adminDenied) adminDenied.hidden = user.is_admin;
@@ -104,6 +115,32 @@ $(function () {
             clearToken();
             window.location.reload();
         });
+    });
+
+    $("[data-password-form]").on("submit", function (event) {
+        event.preventDefault();
+        const $form = $(this);
+        const newPassword = $form.find("[name=new_password]").val();
+        if (newPassword !== $form.find("[name=confirm_password]").val()) {
+            showFeedback($form, "两次输入的新密码不一致。");
+            return;
+        }
+        const button = $form.find("[type=submit]")[0];
+        if (!setButtonLoading(button, true, "修改中…")) return;
+        ajaxRequest({
+            url: "/api/auth/password",
+            method: "POST",
+            auth: true,
+            data: {
+                current_password: $form.find("[name=current_password]").val(),
+                new_password: newPassword,
+                confirm_password: $form.find("[name=confirm_password]").val(),
+            },
+        }).done(() => {
+            showFeedback($form, "密码修改成功。", "success");
+            $form[0].reset();
+        }).fail((xhr) => showFeedback($form, errorMessages(xhr)))
+            .always(() => setButtonLoading(button, false));
     });
 
     // head 中已经根据缓存 Token 同步设置首屏状态；这里再向后端验证真实性。

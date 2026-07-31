@@ -1,0 +1,18 @@
+{% extends "admin/layout.html" %}
+{% block page_id %}users{% endblock %}
+{% block content %}
+<div class="admin-page-heading"><div><span class="eyebrow">USERS</span><h1>用户管理</h1></div>
+    <button class="btn btn-primary" type="button" data-user-create>新增用户</button></div>
+<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>用户</th><th>邮箱</th><th>角色</th><th>操作</th></tr></thead>
+    <tbody data-user-rows></tbody></table><p class="admin-empty d-none" data-user-empty>暂无用户</p></div>
+<div class="modal fade" id="adminUserModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h2 class="modal-title fs-5" data-user-modal-title>新增用户</h2><button class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+    <form class="modal-body stacked-form" data-admin-user-form><input type="hidden" name="user_id"><div class="alert d-none" data-form-feedback></div>
+        <div><label class="form-label">用户名</label><input class="form-control" name="username" maxlength="50" required></div>
+        <div><label class="form-label">昵称</label><input class="form-control" name="nickname" maxlength="50"></div>
+        <div><label class="form-label">邮箱</label><input class="form-control" name="email" type="email" maxlength="254" required></div>
+        <div data-password-field><label class="form-label">初始密码</label><input class="form-control" name="password" type="password" minlength="8" maxlength="128"></div>
+        <label class="form-check"><input class="form-check-input" name="is_admin" type="checkbox"><span class="form-check-label">管理员</span></label>
+        <button class="btn btn-primary" type="submit">保存用户</button>
+    </form></div></div></div>
+{% endblock %}

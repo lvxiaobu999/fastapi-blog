@@ -57,3 +57,19 @@ class UserResponse(UserPrivate):
     """允许通过 API 返回的用户公开信息。"""
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminUserCreate(UserCreate):
+    """管理员后台创建用户的请求；角色字段只在管理员接口出现。"""
+
+    nickname: str | None = Field(default=None, min_length=1, max_length=50)
+    is_admin: bool = False
+
+
+class AdminUserUpdate(BaseModel):
+    """管理员后台可更新的用户资料与角色，不在这里直接修改密码。"""
+
+    username: str | None = Field(default=None, min_length=1, max_length=50)
+    email: EmailStr | None = Field(default=None, max_length=254)
+    nickname: str | None = Field(default=None, min_length=1, max_length=50)
+    is_admin: bool | None = None

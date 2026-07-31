@@ -1,0 +1,9 @@
+{% extends "admin/layout.html" %}
+{% block page_id %}dashboard{% endblock %}
+{% block content %}
+<div class="admin-page-heading"><div><span class="eyebrow">ADMIN</span><h1>后台概览</h1></div></div>
+<div class="admin-metric-grid">
+    <a href="{{ url_for('admin_users') }}"><span>用户管理</span><strong data-user-total>--</strong><small>查看和维护账号</small></a>
+    <a href="{{ url_for('admin_posts') }}"><span>帖子管理</span><strong data-post-total>--</strong><small>维护博客内容</small></a>
+</div>
+{% endblock %}

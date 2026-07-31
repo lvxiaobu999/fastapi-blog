@@ -1,17 +1,11 @@
-{% extends "layout.html" %}
+{% extends "admin/layout.html" %}
+{% block page_id %}posts{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
 <link rel="stylesheet" href="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight.min.css">
 {% endblock head %}
 {% block content %}
-<div class="error-panel" data-admin-denied hidden>
-    <div class="error-code">403</div>
-    <h1>需要管理员权限</h1>
-    <p>当前登录用户没有发布或编辑文章的权限，请切换管理员账号。</p>
-    <a class="btn btn-primary" href="{{ url_for('home') }}">返回首页</a>
-</div>
-
-<div class="editor-shell" data-require-admin hidden>
+<div class="editor-shell admin-editor-shell">
     <section class="editor-panel" aria-labelledby="editor-title">
         <div class="section-heading editor-heading">
             <div>
@@ -59,7 +53,7 @@
                 <textarea class="d-none" id="content" name="content">{{ post.content | default('') if post | default(none) else '' }}</textarea>
             </div>
             <div class="form-actions editor-actions">
-                <a class="btn btn-outline-secondary" href="{{ url_for('home') }}">取消</a>
+                <a class="btn btn-outline-secondary" href="{{ url_for('admin_posts') }}">取消</a>
                 <div class="editor-primary-actions">
                     <button class="btn btn-outline-primary" type="button" data-post-preview
                             data-bs-toggle="modal" data-bs-target="#postPreviewModal">
@@ -101,4 +95,5 @@
 {% block scripts %}
 <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
 <script src="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight-all.min.js"></script>
+<script type="module" src="{{ url_for('static', path='js/posts.js') }}"></script>
 {% endblock scripts %}

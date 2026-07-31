@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api_responses import API_ERROR_RESPONSES, success_response
@@ -11,6 +11,7 @@ from app.dependencies.auth import CurrentUser
 from app.schemas import UserCreate, UserResponse, UserUpdate
 from app.schemas.api import ApiSuccess
 from app.services import users as user_service
+from app.services.images import InvalidImageError, save_profile_image
 
 router = APIRouter(prefix="/api/users", tags=["users"], responses=API_ERROR_RESPONSES)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
@@ -106,3 +107,22 @@ async def delete_user(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
     await user_service.delete_user(session, user)
     return success_response(request, None)
+
+
+@router.post("/me/avatar", response_model=ApiSuccess[UserResponse])
+async def upload_avatar(
+    request: Request,
+    session: DbSession,
+    current_user: CurrentUser,
+    avatar: Annotated[UploadFile, File(description="PNG, JPEG, GIF or WebP; max 5 MB")],
+) -> ApiSuccess[UserResponse]:
+    """校验并保存当前用户头像，不允许通过路径参数替其他用户上传。"""
+
+    try:
+        filename = await save_profile_image(avatar)
+    except InvalidImageError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    finally:
+        await avatar.close()
+    user = await user_service.set_profile_image(session, current_user, filename)
+    return success_response(request, UserResponse.model_validate(user))

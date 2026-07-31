@@ -109,3 +109,76 @@ async def test_delete_missing_and_validation_paths(client: AsyncClient) -> None:
         json={"username": "x", "email": "invalid", "password": "short"},
     )
     assert invalid.status_code == 422
+
+
+async def test_user_can_upload_valid_avatar(
+    client: AsyncClient,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """头像接口保存随机文件名，并拒绝伪造图片内容。"""
+
+    from app.services import images as image_service
+
+    user_id = (await create_user(client)).json()["data"]["id"]
+    headers = auth_headers(user_id)
+    monkeypatch.setattr(image_service, "PROFILE_IMAGE_DIR", tmp_path / "profile_pics")
+
+    invalid = await client.post(
+        "/api/users/me/avatar",
+        headers=headers,
+        files={"avatar": ("fake.png", b"not-an-image", "image/png")},
+    )
+    valid = await client.post(
+        "/api/users/me/avatar",
+        headers=headers,
+        files={"avatar": ("avatar.png", b"\x89PNG\r\n\x1a\nimage", "image/png")},
+    )
+
+    assert invalid.status_code == 400
+    assert valid.status_code == 200
+    assert valid.json()["data"]["image_path"].startswith("/media/profile_pics/")
+    assert len(list((tmp_path / "profile_pics").glob("*.png"))) == 1
+
+
+async def test_admin_user_crud_is_protected(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """普通用户被拒绝，管理员可以新增、修改角色和删除其他用户。"""
+
+    regular_id = (await create_user(client)).json()["data"]["id"]
+    regular_headers = auth_headers(regular_id)
+    assert (await client.get("/api/admin/users", headers=regular_headers)).status_code == 403
+
+    async with session_factory() as session:
+        admin = await session.get(User, regular_id)
+        assert admin is not None
+        admin.is_admin = True
+        await session.commit()
+
+    created = await client.post(
+        "/api/admin/users",
+        headers=regular_headers,
+        json={
+            "username": "managed",
+            "email": "managed@example.com",
+            "password": "password123",
+            "nickname": "后台用户",
+            "is_admin": False,
+        },
+    )
+    managed_id = created.json()["data"]["id"]
+    updated = await client.patch(
+        f"/api/admin/users/{managed_id}",
+        headers=regular_headers,
+        json={"nickname": "内容管理员", "is_admin": True},
+    )
+    self_delete = await client.delete(f"/api/admin/users/{regular_id}", headers=regular_headers)
+    deleted = await client.delete(f"/api/admin/users/{managed_id}", headers=regular_headers)
+
+    assert created.status_code == 201
+    assert updated.status_code == 200
+    assert updated.json()["data"]["is_admin"] is True
+    assert self_delete.status_code == 400
+    assert deleted.status_code == 200
