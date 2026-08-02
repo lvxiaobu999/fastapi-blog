@@ -13,6 +13,12 @@ from app.models.user import User
 from app.schemas.post import PostCreate, PostQueryParams, PostTitleSearchParams, PostUpdate
 from app.services import categories as category_service
 
+# ==================== Service 入口导读 ====================
+# 上游调用者：pages、api_posts、api_activities 和 comments Router。
+# 本模块负责文章详情/列表/标题搜索以及创建、更新、删除，并预加载 author/category。
+# 分类存在性由 categories Service 协助验证；Router 负责管理员权限和 HTTP 异常转换。
+# create/update/delete 在本模块提交事务，纯查询函数不会 commit。
+
 
 class PostAuthorNotFoundError(Exception):
     """创建帖子时指定的作者用户不存在。"""
@@ -23,7 +29,12 @@ class PostCategoryNotFoundError(Exception):
 
 
 async def create_post(session: AsyncSession, data: PostCreate) -> Post:
-    """验证作者与分类、创建帖子并提交事务。"""
+    """完成有权限用户在后台发布文章的持久化流程。
+
+    发布表单提交标题、正文和分类，认证用户 ID 由 Router 写入请求数据。这里确认作者和
+    分类真实存在，防止生成无法展示的文章；保存后重新加载作者/分类，使创建响应能直接
+    更新或跳转页面。权限不在这里判断，同一函数也可供测试和可信内部任务复用。
+    """
 
     author = await session.get(User, data.user_id)
     if author is None:
@@ -56,7 +67,11 @@ async def create_post(session: AsyncSession, data: PostCreate) -> Post:
 
 
 async def update_post(session: AsyncSession, post: Post, data: PostUpdate) -> Post:
-    """只更新请求中实际提供的标题或正文，并返回更新后的帖子。"""
+    """保存后台文章编辑页实际修改的内容，而不覆盖未编辑字段。
+
+    PATCH 表单可能只改标题、正文或分类；``exclude_unset`` 保留没有提交的旧值。分类必须
+    重新确认存在，空修改不产生事务。提交后重新取得关联数据，供管理列表或详情页展示。
+    """
 
     changes = data.model_dump(exclude_unset=True)
 
@@ -84,7 +99,11 @@ async def update_post(session: AsyncSession, post: Post, data: PostUpdate) -> Po
 
 
 async def get_post(session: AsyncSession, post_id: int) -> Post | None:
-    """按主键查询一篇帖子，并预加载作者和分类；不存在时返回 None。"""
+    """为详情、编辑、评论和互动入口提供同一份“可用文章”查询。
+
+    这些功能在继续执行前都必须按 URL 中的 ID 找到文章，并需要作者/分类用于响应渲染。
+    因此提前预加载关系；找不到返回 None，由不同 Router 分别决定 404 或 WebSocket 错误。
+    """
 
     statement = (
         select(Post)
@@ -95,13 +114,22 @@ async def get_post(session: AsyncSession, post_id: int) -> Post | None:
 
 
 def _escape_like_keyword(keyword: str) -> str:
-    """转义 LIKE 通配符，让用户输入的百分号和下划线按普通字符搜索。"""
+    """保证搜索框输入的 `%`、`_` 表示字符本身，而不是偷偷扩大查询范围。
+
+    文章列表和标题联想都使用 SQL LIKE；集中转义能让两个搜索入口行为一致，也避免用户
+    输入通配符后意外匹配全部内容。这是搜索业务的内部安全/正确性辅助步骤。
+    """
 
     return keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 async def list_posts(session: AsyncSession, params: PostQueryParams) -> list[Post]:
-    """分页查询帖子，并按关键词或分类 slug 筛选。"""
+    """为搜索结果页、分类结果页和后台文章列表生成帖子集合。
+
+    首页点击搜索时携带 keyword 跳到列表页，点击类型 Tag 时携带 category；后台也复用列表。
+    本函数组合这些可选条件、预加载展示字段并分页排序。这样首页无需加载文章，所有结果页
+    仍共享一致筛选规则。它只读取数据库，不记录浏览；浏览必须在真正进入详情页时发生。
+    """
 
     statement = select(Post).options(
         selectinload(Post.author), selectinload(Post.category)
@@ -136,7 +164,12 @@ async def list_posts(session: AsyncSession, params: PostQueryParams) -> list[Pos
 async def search_post_titles(
     session: AsyncSession, params: PostTitleSearchParams
 ) -> list[Post]:
-    """按标题模糊搜索少量候选项，供全局搜索弹窗实时展示。"""
+    """为顶部导航搜索模态框提供输入过程中的标题联想候选。
+
+    用户每次停止输入（前端防抖后）会调用此查询，点击候选直接进入详情页。因此只需要文章
+    ID 和标题，不需要正文、作者等大字段；限制结果数量也能降低频繁 AJAX 请求的数据库和
+    网络成本。正式提交搜索仍进入 ``list_posts`` 支持标题与正文的完整结果。
+    """
 
     keyword = params.keyword.strip()
     if not keyword:
@@ -156,7 +189,11 @@ async def search_post_titles(
 
 
 async def delete_post(session: AsyncSession, post: Post) -> None:
-    """异步删除帖子并提交事务。"""
+    """执行后台文章管理表中的删除操作并提交。
+
+    api_posts Router 在调用前负责认证、管理员权限和文章存在性；这里保持单一职责，只执行
+    持久化删除。评论及互动记录的清理由数据库级联约束保证，避免遗留指向不存在文章的数据。
+    """
 
     await session.delete(post)
     await session.commit()

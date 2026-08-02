@@ -16,6 +16,10 @@ from app.dependencies.auth import CurrentUser
 from app.services import auth as auth_service
 from app.services import users as user_service
 
+# ==================== Router 入口导读 ====================
+# auth.js 的登录、改密和启动会话校验，以及 api.js 的 Token 刷新会进入本 Router。
+# prefix 让本文件所有路径统一以 /api/auth 开头。Router 只处理 HTTP/Cookie 契约，
+# 密码校验、Token 和 Refresh Session 的真实业务交给 services/auth.py。
 router = APIRouter(prefix="/api/auth", tags=["auth"], responses=API_ERROR_RESPONSES)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 

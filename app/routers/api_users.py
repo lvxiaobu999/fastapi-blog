@@ -13,6 +13,10 @@ from app.schemas.api import ApiSuccess
 from app.services import users as user_service
 from app.services.images import InvalidImageError, save_profile_image
 
+# ==================== Router 入口导读 ====================
+# 注册表单会 POST /api/users；个人资料页 forms.js 会 PATCH 用户资料和即时上传头像；
+# 公开资料页或管理逻辑也会读取用户。CurrentUser 依赖先验证 Bearer Token，Router 再检查
+# “本人或管理员”权限，持久化工作交给 services/users.py 和 services/images.py。
 router = APIRouter(prefix="/api/users", tags=["users"], responses=API_ERROR_RESPONSES)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 

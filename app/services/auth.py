@@ -13,6 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import get_settings
 from app.models import RefreshSession, User
 
+# ==================== Service 入口导读 ====================
+# 上游调用者：api_auth Router、认证 Depends、users Service。
+# 本模块负责密码哈希/校验、登录身份查询、Access JWT、Refresh Session 生命周期。
+# 它不知道 HTTP Header、Cookie 或状态码；Router/Depends 把返回值或异常翻译成 HTTP。
+# 密码计算会切到工作线程；Refresh Session 写操作使用调用方传入的 AsyncSession。
+
 # recommended() 当前选择 Argon2。实例可以安全复用，前导下划线表示其他模块不应绕过
 # 本文件提供的 hash_password()/verify_password() 接口直接操作它。
 _password_hash = PasswordHash.recommended()
@@ -23,6 +29,9 @@ _password_hash = PasswordHash.recommended()
 
 async def hash_password(password: str) -> str:
     """把明文密码转换为适合写入数据库的 Argon2 哈希。
+
+    用户注册、管理员创建账号和修改密码都需要保存密码，但产品不能在数据库泄露时暴露
+    用户明文密码，因此这些入口统一先调用本函数，数据库只接收不可逆哈希。
 
     每次哈希都会包含随机盐，所以同一个明文密码生成的字符串通常不同。调用方只能
     保存返回值，不能保存或记录传入的明文密码。Argon2 属于 CPU 密集计算，因此通过
@@ -35,6 +44,9 @@ async def hash_password(password: str) -> str:
 async def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证用户输入的明文密码是否匹配数据库中的 Argon2 哈希。
 
+    登录需要证明操作者知道密码，修改密码还需要再次验证旧密码；这两个用户操作都不能
+    直接读取原密码（数据库没有保存它），所以使用密码库验证输入与已有哈希是否对应。
+
     这里不能重新哈希明文后比较字符串，因为 Argon2 每次使用随机盐；必须由密码库
     从已有哈希中读取算法参数和盐，再执行验证。返回值只表示是否匹配。
     """
@@ -44,6 +56,9 @@ async def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 async def authenticate_user(session: AsyncSession, username: str, password: str) -> User | None:
     """使用用户名或邮箱校验密码；失败统一返回 ``None``，避免泄露账号是否存在。
+
+    它对应登录窗口点击“登录”后的核心身份确认：用户既可以填 username，也可以填 email，
+    成功后 Router 才能签发 Token、关闭登录窗口并显示头像；失败则显示统一登录错误。
 
     ``session`` 由 FastAPI 依赖注入，Service 不自行创建连接，便于测试替换数据库。
     密码验证使用工作线程，因为 Argon2 是有意设计得较慢的 CPU 密集操作；直接在
@@ -70,6 +85,9 @@ async def authenticate_user(session: AsyncSession, username: str, password: str)
 def create_access_token(user_id: int, *, expires_delta: timedelta | None = None) -> str:
     """为用户签发带 ``sub``、``iat`` 和 ``exp`` 的短期 JWT。
 
+    登录成功或刷新会话成功后，前端需要一张短期“身份凭证”访问发帖、评论、点赞等受保护
+    接口。Access Token 正是这张凭证；短期过期可降低泄露风险，过期后由 Refresh 流程续签。
+
     ``sub`` 使用数据库主键而不是用户名：用户名将来可能被修改，主键身份更稳定。
     ``expires_delta`` 主要用于过期 Token 测试；正常登录使用 Settings 中的统一时长。
     """
@@ -91,6 +109,9 @@ def create_access_token(user_id: int, *, expires_delta: timedelta | None = None)
 
 def verify_access_token(token: str) -> int:
     """验证签名、过期时间和用户主键声明，并返回数据库用户 ID。
+
+    每个受保护请求都必须先回答“这张凭证是否真实且仍有效”。该函数是认证 Depends 和评论
+    WebSocket 认证的共同底层步骤；无效或过期最终转成 401，前端据此清理假登录状态并弹窗。
 
     ``algorithms`` 必须由服务端配置提供，不能从 Token Header 读取，否则攻击者可能
     利用算法降级。``require`` 让缺少关键声明的 Token 也被拒绝，而不是当成永久凭据。
@@ -132,6 +153,9 @@ def _utc(value: datetime) -> datetime:
 async def create_refresh_session(session: AsyncSession, user_id: int) -> str:
     """创建随机 Refresh Token，并记录绝对过期和最近活动时间。
 
+    Access Token 有意设置得较短，但用户正常刷新浏览器时不应立刻重新输入密码。登录成功后
+    创建这条服务端可撤销会话并写入 HttpOnly Cookie，让前端能安全换取新的 Access Token。
+
     ``expires_at`` 是本条 Refresh Session 的绝对截止时间；达到它之后，即使用户一直
     操作也不能继续使用。``last_activity_at`` 是最近一次成功认证活动的时间，用来计算
     用户连续多久没有操作。两者分别解决“会话最长多久”和“空闲多久退出”。
@@ -157,6 +181,9 @@ async def create_refresh_session(session: AsyncSession, user_id: int) -> str:
 
 async def rotate_refresh_session(session: AsyncSession, raw_token: str) -> tuple[int, str] | None:
     """校验 Refresh Cookie，执行空闲/绝对过期检查并轮换 Token。
+
+    它对应页面刷新或 Access Token 过期后的“尝试恢复登录”。有效会话返回用户 ID 和新 Token；
+    失效则返回 None，使前端强制退出并在下一次认证操作时打开登录窗口。
 
     轮换表示旧 Token 使用一次后立即标记为撤销，再生成一个新 Token。即使旧 Cookie
     被复制，攻击者之后再使用它也会因 ``revoked=True`` 失败。
@@ -198,6 +225,9 @@ async def rotate_refresh_session(session: AsyncSession, raw_token: str) -> tuple
 
 async def touch_refresh_session(session: AsyncSession, raw_token: str, user_id: int) -> bool:
     """在有效的受保护请求中更新最近活动时间，不延长本条 Session 的绝对过期时间。
+
+    该设计满足“正在持续使用站点的用户不应被空闲超时踢出”，同时保留最长会话期限。用户
+    发帖、评论等有效请求会留下最近活动时间；只打开页面但长期不操作则最终需要重新登录。
 
     本函数由 ``get_current_user()`` 调用。用户每完成一次有效的受保护请求，就把
     ``last_activity_at`` 更新为当前时间，从而实现“持续操作不会因空闲超时退出”。

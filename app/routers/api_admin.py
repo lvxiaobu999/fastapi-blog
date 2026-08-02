@@ -16,6 +16,10 @@ from app.schemas.api import ApiSuccess
 from app.schemas.user import AdminUserCreate, AdminUserUpdate, UserResponse
 from app.services import users as user_service
 
+# ==================== Router 入口导读 ====================
+# admin.js 在后台用户管理页加载、创建、编辑或删除用户时进入本 Router。
+# 每个端点都要求 AdminUser：先认证用户，再确认 is_admin=True。这里负责管理员专属的
+# HTTP 权限和状态码，用户查询、写入和冲突判断仍复用 services/users.py。
 router = APIRouter(prefix="/api/admin/users", tags=["admin"], responses=API_ERROR_RESPONSES)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 

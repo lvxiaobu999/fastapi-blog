@@ -15,6 +15,11 @@ from app.services import posts as post_service
 from app.services import users as user_service
 from app.templating import templates
 
+# ==================== Router 入口导读 ====================
+# 这里处理浏览器“直接打开页面”的 GET 请求，例如地址栏访问 /posts/1，或模板里的
+# url_for(...) 链接跳转。它负责查询模板首屏需要的数据并返回 HTML，不处理 AJAX 写操作。
+# 页面中的后续登录、发帖、点赞、评论等动作会由 static/js 再调用对应 /api Router。
+# include_in_schema=False 表示这些 HTML 页面不出现在 Swagger API 文档中。
 router = APIRouter(include_in_schema=False)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 

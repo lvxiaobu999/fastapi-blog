@@ -29,6 +29,10 @@ from app.services import comments as comment_service
 from app.services.auth import verify_access_token
 from app.websockets.comments import comment_connections
 
+# ==================== Router 入口导读 ====================
+# comments.js 打开文章详情后先 GET 历史评论，再连接 /ws。WebSocket 建立后第一条消息必须
+# 携带 Token 完成认证，之后 comment.create 消息才会写库并广播。Router 管理协议、连接
+# 生命周期和错误消息；评论校验/写库交给 services/comments.py，房间连接交给 websockets/。
 router = APIRouter(prefix="/api/posts/{post_id}/comments", tags=["comments"])
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 AUTH_TIMEOUT_SECONDS = 10

@@ -13,6 +13,10 @@ from app.schemas.post import PostInteractionState, UserActivityItem, UserComment
 from app.services import post_activities as activity_service
 from app.services import posts as post_service
 
+# ==================== Router 入口导读 ====================
+# post-activities.js 在文章详情加载时记录浏览，在点击点赞/收藏时切换关系；个人活动页
+# 用它读取评论、赞过、收藏和足迹。浏览与状态查询允许游客，个人动作要求 CurrentUser。
+# Router 只负责路径、认证和 404，统计与数据库事务交给 services/post_activities.py。
 router = APIRouter(tags=["post activities"], responses=API_ERROR_RESPONSES)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 

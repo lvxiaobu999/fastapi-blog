@@ -24,6 +24,10 @@ from app.services import posts as post_service
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
+# ==================== Router 入口导读 ====================
+# search.js 调用标题搜索，admin.js 调用后台文章列表，posts.js 调用文章发布、编辑和图片上传。
+# GET 查询公开可用；写文章和上传图片要求 AdminUser。Router 校验 HTTP 参数和权限，
+# 文章/分类查询写入交给 services/posts.py，图片文件交给 services/images.py。
 router = APIRouter(prefix="/api/posts", tags=["posts"], responses=API_ERROR_RESPONSES)
 
 
