@@ -188,6 +188,8 @@ async def test_admin_pages_use_separate_layout(client: AsyncClient) -> None:
     assert "window.confirm" not in admin_script.text
     assert "deleteModal?.show()" in admin_script.text
     assert "登录状态已失效，请返回博客重新登录。" not in admin_script.text
+    assert "请登录管理员账号后继续。" not in admin_script.text
+    assert "blog:auth-required" in admin_script.text
 
 
 async def test_post_pages_include_rich_editor_and_markdown_viewer(
