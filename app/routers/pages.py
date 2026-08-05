@@ -87,6 +87,21 @@ async def my_activities_page(request: Request):
     return templates.TemplateResponse(request, "activities.html", {"title": "我的活动"})
 
 
+@router.get("/forbidden", name="permission_denied")
+async def permission_denied_page() -> None:
+    """为前端权限校验提供统一的 403 落地页。
+
+    后台 HTML 首次打开时没有 Bearer Header，无法仅凭页面 GET 判断 localStorage 中的用户。
+    ``admin.js`` 调用 ``/api/auth/me`` 确认是普通用户后跳转到这里；抛出 HTTPException 会由
+    全局页面异常处理器渲染 ``error_403.html``，并保留真正的 HTTP 403 状态码。
+    """
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Admin access required",
+    )
+
+
 @router.get("/posts/new", name="post_create")
 async def new_post_page(request: Request, session: DbSession):
     """渲染带分类选择的新建帖子表单。"""

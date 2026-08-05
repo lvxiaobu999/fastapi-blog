@@ -12,6 +12,11 @@ $(function () {
     const page = document.body.dataset.adminPage;
     const content = document.querySelector("[data-admin-content]");
     const accessState = document.querySelector("[data-admin-state]");
+    const deleteModalElement = document.querySelector("[data-delete-modal]");
+    const deleteModal = deleteModalElement
+        ? bootstrap.Modal.getOrCreateInstance(deleteModalElement)
+        : null;
+    let pendingDelete = null;
 
     function showAccessError(message) {
         accessState.textContent = message;
@@ -47,9 +52,10 @@ $(function () {
                 const email = document.createElement("td"); email.textContent = user.email;
                 const role = document.createElement("td"); role.textContent = user.is_admin ? "管理员" : "普通用户";
                 const actions = document.createElement("td"); actions.className = "admin-row-actions";
+                const deleteUser = actionButton("删除", "btn btn-sm btn-outline-danger", "delete-user", user.id);
                 actions.append(
                     actionButton("编辑", "btn btn-sm btn-outline-secondary", "edit-user", user.id),
-                    actionButton("删除", "btn btn-sm btn-outline-danger", "delete-user", user.id),
+                    deleteUser,
                 );
                 row.append(identity, email, role, actions);
                 row.dataset.user = JSON.stringify(user);
@@ -82,7 +88,8 @@ $(function () {
                 const edit = document.createElement("a"); edit.className = "btn btn-sm btn-outline-secondary"; edit.href = `/posts/${post.id}/edit`; edit.textContent = "编辑";
                 const publish = actionButton(post.is_published ? "下架" : "上架", "btn btn-sm btn-outline-secondary", "toggle-post", post.id);
                 publish.dataset.published = String(post.is_published);
-                actions.append(edit, publish, actionButton("删除", "btn btn-sm btn-outline-danger", "delete-post", post.id));
+                const deletePost = actionButton("删除", "btn btn-sm btn-outline-danger", "delete-post", post.id);
+                actions.append(edit, publish, deletePost);
                 row.append(title, category, author, status, date, actions); rows.append(row);
             });
             document.querySelector("[data-post-empty]").classList.toggle("d-none", posts.length > 0);
@@ -100,11 +107,18 @@ $(function () {
     }
 
     ajaxRequest({url: "/api/auth/me", auth: true, refreshAuth: false}).done((user) => {
-        if (!user.is_admin) { showAccessError("只有管理员可以进入后台。"); return; }
+        if (!user.is_admin) {
+            // HTML GET 无法读取 localStorage Token，所以先通过 API 确认身份。普通用户身份
+            // 有效但权限不足，跳到真正返回 HTTP 403 的页面；replace 防止返回键反复进入。
+            window.location.replace("/forbidden");
+            return;
+        }
         document.querySelector("[data-admin-identity]").textContent = user.nickname;
         document.querySelector("[data-admin-avatar]").src = user.image_path;
         accessState.hidden = true; content.hidden = false; initializePage();
-    }).fail(() => showAccessError("登录状态已失效，请返回博客重新登录。"));
+    // ajaxRequest 遇到 401 会通过统一事件让 auth.js 清理 Token 并打开登录模态框。
+    // 这里仅隐藏后台内容，登录成功后 auth.js 会刷新当前页面并重新执行管理员校验。
+    }).fail(() => showAccessError("请登录管理员账号后继续。"));
 
     $("[data-admin-menu]").on("click", () => document.querySelector(".admin-sidebar").classList.toggle("open"));
     $("[data-user-create]").on("click", () => {
@@ -135,11 +149,42 @@ $(function () {
 
     $(document).on("click", "[data-action=delete-user], [data-action=delete-post]", function () {
         const isUser = this.dataset.action === "delete-user";
-        if (!window.confirm(`确定删除这个${isUser ? "用户" : "帖子"}吗？此操作无法撤销。`)) return;
-        if (!setButtonLoading(this, true, "删除中…")) return;
-        ajaxRequest({url: isUser ? `/api/admin/users/${this.dataset.id}` : `/api/posts/${this.dataset.id}`, method: "DELETE", auth: true})
-            .done(() => isUser ? loadUsers() : loadPosts())
-            .fail((xhr) => { window.alert(errorMessages(xhr)); setButtonLoading(this, false); });
+        pendingDelete = {
+            id: this.dataset.id,
+            isUser,
+            sourceButton: this,
+        };
+        document.querySelector("[data-delete-title]").textContent = `确认删除${isUser ? "用户" : "帖子"}？`;
+        document.querySelector("[data-delete-message]").textContent = isUser
+            ? "用户账号及其关联内容将被永久删除，此操作无法撤销。"
+            : "帖子正文、评论以及相关互动数据将被永久删除。暂时隐藏内容请使用“下架”。";
+        document.querySelector("[data-delete-feedback]").classList.add("d-none");
+        deleteModal?.show();
+    });
+
+    $(document).on("click", "[data-delete-confirm]", function () {
+        if (!pendingDelete || !setButtonLoading(this, true, "删除中…")) return;
+        const target = pendingDelete;
+        ajaxRequest({
+            url: target.isUser ? `/api/admin/users/${target.id}` : `/api/posts/${target.id}`,
+            method: "DELETE",
+            auth: true,
+        })
+            .done(() => {
+                deleteModal?.hide();
+                target.isUser ? loadUsers() : loadPosts();
+            })
+            .fail((xhr) => {
+                const feedback = document.querySelector("[data-delete-feedback]");
+                feedback.textContent = errorMessages(xhr);
+                feedback.classList.remove("d-none");
+            })
+            .always(() => setButtonLoading(this, false));
+    });
+
+    deleteModalElement?.addEventListener("hidden.bs.modal", () => {
+        pendingDelete = null;
+        document.querySelector("[data-delete-feedback]").classList.add("d-none");
     });
 
     $(document).on("click", "[data-action=toggle-post]", function () {

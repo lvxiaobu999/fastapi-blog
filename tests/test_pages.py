@@ -88,6 +88,17 @@ async def test_page_router_returns_html_404(client: AsyncClient) -> None:
     assert "text/html" in response.headers["content-type"]
 
 
+async def test_permission_denied_page_returns_html_403(client: AsyncClient) -> None:
+    """普通用户权限校验失败后的落地页必须保留真实 403 状态。"""
+
+    response = await client.get("/forbidden")
+
+    assert response.status_code == 403
+    assert "没有访问权限" in response.text
+    assert "没有执行当前操作所需的权限" in response.text
+    assert "text/html" in response.headers["content-type"]
+
+
 async def test_layout_uses_auth_modals_and_es_modules(client: AsyncClient) -> None:
     """导航登录注册只打开模态框，前端写操作由 ES module 接管。"""
 
@@ -163,9 +174,20 @@ async def test_admin_pages_use_separate_layout(client: AsyncClient) -> None:
     assert "用户管理" in users.text
     assert "帖子管理" in posts.text
     assert "/static/js/admin.js" in dashboard.text
+    assert "/static/js/auth.js" in dashboard.text
+    assert 'id="loginModal"' in dashboard.text
+    assert "data-login-form" in dashboard.text
     assert "admin-theme-toggle" in dashboard.text
     assert "/static/js/theme.js" in dashboard.text
     assert "theme-option" not in dashboard.text
+    assert 'id="adminDeleteModal"' in dashboard.text
+    assert "data-delete-confirm" in dashboard.text
+
+    admin_script = await client.get("/static/js/admin.js")
+    assert 'window.location.replace("/forbidden")' in admin_script.text
+    assert "window.confirm" not in admin_script.text
+    assert "deleteModal?.show()" in admin_script.text
+    assert "登录状态已失效，请返回博客重新登录。" not in admin_script.text
 
 
 async def test_post_pages_include_rich_editor_and_markdown_viewer(

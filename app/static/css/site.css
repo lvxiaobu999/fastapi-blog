@@ -545,6 +545,12 @@ html[data-auth-state="user"][data-admin-state="true"] [data-auth-admin] {
 .admin-user-cell span { color: var(--text-muted); font-size: .8rem; }
 .admin-row-actions { display: flex; gap: 7px; white-space: nowrap; }
 .admin-empty { margin: 0; padding: 40px; color: var(--text-muted); text-align: center; }
+.admin-delete-modal { max-width: 460px; margin-inline: auto; }
+.admin-delete-modal .modal-header { min-height: 32px; padding: 16px 20px 0; }
+.admin-delete-modal .modal-body { padding-inline: 28px; }
+.admin-delete-modal .modal-footer { padding: 12px 28px 26px; }
+.admin-delete-modal .modal-title { margin: 5px 0 10px; font-size: 1.35rem; }
+.delete-modal-message { margin: 0; color: var(--text-muted); line-height: 1.65; }
 
 @media (max-width: 767.98px) {
     .blog-navbar .navbar-collapse { padding: 10px 0 4px; }
