@@ -24,6 +24,8 @@
                     </span>
                 </div>
                 <h1>{{ post.title }}</h1>
+                {% if post.cover_image_url %}<img class="post-detail-cover" src="{{ post.cover_image_url }}" alt="{{ post.title }}横图">{% endif %}
+                {% if post.summary %}<p class="post-detail-summary">{{ post.summary }}</p>{% endif %}
                 <div class="post-content" id="post-viewer"></div>
                 <textarea class="d-none" id="post-markdown">{{ post.content }}</textarea>
                 <div class="post-interactions" data-post-interactions data-post-id="{{ post.id }}">

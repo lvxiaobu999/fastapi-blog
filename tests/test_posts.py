@@ -53,6 +53,32 @@ async def test_create_post_with_author(session: AsyncSession, author: User) -> N
     assert post.category.slug == "other"
 
 
+async def test_create_and_update_post_publishing_fields(
+    session: AsyncSession, author: User
+) -> None:
+    """摘要、横图和上下架状态应随创建和部分更新持久化。"""
+
+    post = await create_post(
+        session,
+        PostCreate(
+            title="Draft",
+            summary="A short summary",
+            cover_image_url="/media/post_images/cover.png",
+            content="Body",
+            is_published=False,
+            user_id=author.id,
+        ),
+    )
+
+    assert post.summary == "A short summary"
+    assert post.cover_image_url == "/media/post_images/cover.png"
+    assert post.is_published is False
+
+    updated = await update_post(session, post, PostUpdate(is_published=True, summary=None))
+    assert updated.is_published is True
+    assert updated.summary is None
+
+
 async def test_create_post_rejects_missing_author(session: AsyncSession) -> None:
     with pytest.raises(PostAuthorNotFoundError):
         await create_post(
@@ -136,6 +162,32 @@ async def test_list_posts_searches_title_and_content(
 
     assert [post.id for post in title_results] == [fastapi_post.id]
     assert [post.id for post in content_results] == [database_post.id]
+
+
+async def test_public_queries_hide_unpublished_posts(
+    session: AsyncSession, author: User
+) -> None:
+    """下架文章仅能由后台查询，不能出现在公开列表、详情或标题联想中。"""
+
+    hidden = await create_post(
+        session,
+        PostCreate(
+            title="Hidden FastAPI",
+            content="Private body",
+            is_published=False,
+            user_id=author.id,
+        ),
+    )
+
+    assert await get_post(session, hidden.id, include_unpublished=False) is None
+    assert await list_posts(session, PostQueryParams(keyword="Hidden")) == []
+    assert await search_post_titles(
+        session, PostTitleSearchParams(keyword="Hidden")
+    ) == []
+    admin_results = await list_posts(
+        session, PostQueryParams(keyword="Hidden"), include_unpublished=True
+    )
+    assert [post.id for post in admin_results] == [hidden.id]
 
 
 async def test_list_posts_supports_pagination(session: AsyncSession, author: User) -> None:

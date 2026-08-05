@@ -120,7 +120,7 @@ async def edit_post_page(request: Request, post_id: int, session: DbSession):
 async def post_detail(request: Request, post_id: int, session: DbSession):
     """查询并渲染帖子详情。"""
 
-    post = await post_service.get_post(session, post_id)
+    post = await post_service.get_post(session, post_id, include_unpublished=False)
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 

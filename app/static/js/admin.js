@@ -62,7 +62,8 @@ $(function () {
     function loadPosts() {
         const rows = document.querySelector("[data-post-rows]");
         if (!rows) return;
-        ajaxRequest({url: "/api/posts?limit=100", auth: true}).done((posts) => {
+        // 管理员入口包含下架文章，公开列表接口会主动过滤它们。
+        ajaxRequest({url: "/api/posts/admin?limit=100", auth: true}).done((posts) => {
             rows.replaceChildren();
             posts.forEach((post) => {
                 const row = document.createElement("tr");
@@ -71,11 +72,18 @@ $(function () {
                 title.append(link);
                 const category = document.createElement("td"); category.textContent = post.category.name;
                 const author = document.createElement("td"); author.textContent = post.author.nickname;
+                const status = document.createElement("td");
+                const badge = document.createElement("span");
+                badge.className = `status-pill ${post.is_published ? "status-published" : "status-unpublished"}`;
+                badge.textContent = post.is_published ? "已上架" : "已下架";
+                status.append(badge);
                 const date = document.createElement("td"); date.textContent = formatDate(post.created_at);
                 const actions = document.createElement("td"); actions.className = "admin-row-actions";
                 const edit = document.createElement("a"); edit.className = "btn btn-sm btn-outline-secondary"; edit.href = `/posts/${post.id}/edit`; edit.textContent = "编辑";
-                actions.append(edit, actionButton("删除", "btn btn-sm btn-outline-danger", "delete-post", post.id));
-                row.append(title, category, author, date, actions); rows.append(row);
+                const publish = actionButton(post.is_published ? "下架" : "上架", "btn btn-sm btn-outline-secondary", "toggle-post", post.id);
+                publish.dataset.published = String(post.is_published);
+                actions.append(edit, publish, actionButton("删除", "btn btn-sm btn-outline-danger", "delete-post", post.id));
+                row.append(title, category, author, status, date, actions); rows.append(row);
             });
             document.querySelector("[data-post-empty]").classList.toggle("d-none", posts.length > 0);
         });
@@ -87,7 +95,7 @@ $(function () {
         if (page === "posts") loadPosts();
         if (page === "dashboard") {
             ajaxRequest({url: "/api/admin/users", auth: true}).done((users) => { document.querySelector("[data-user-total]").textContent = users.length; });
-            ajaxRequest({url: "/api/posts?limit=100", auth: true}).done((posts) => { document.querySelector("[data-post-total]").textContent = posts.length; });
+            ajaxRequest({url: "/api/posts/admin?limit=100", auth: true}).done((posts) => { document.querySelector("[data-post-total]").textContent = posts.length; });
         }
     }
 
@@ -131,6 +139,14 @@ $(function () {
         if (!setButtonLoading(this, true, "删除中…")) return;
         ajaxRequest({url: isUser ? `/api/admin/users/${this.dataset.id}` : `/api/posts/${this.dataset.id}`, method: "DELETE", auth: true})
             .done(() => isUser ? loadUsers() : loadPosts())
+            .fail((xhr) => { window.alert(errorMessages(xhr)); setButtonLoading(this, false); });
+    });
+
+    $(document).on("click", "[data-action=toggle-post]", function () {
+        const nextPublished = this.dataset.published !== "true";
+        if (!setButtonLoading(this, true, nextPublished ? "上架中…" : "下架中…")) return;
+        ajaxRequest({url: `/api/posts/${this.dataset.id}`, method: "PATCH", auth: true, data: {is_published: nextPublished}})
+            .done(loadPosts)
             .fail((xhr) => { window.alert(errorMessages(xhr)); setButtonLoading(this, false); });
     });
 });

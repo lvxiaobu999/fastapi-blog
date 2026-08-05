@@ -10,7 +10,21 @@ class PostBase(BaseModel):
     """创建请求与响应共同包含的帖子基础字段。"""
 
     title: str = Field(min_length=1, max_length=100)
+    summary: str | None = Field(default=None, max_length=300)
+    cover_image_url: str | None = Field(default=None, max_length=500)
     content: str = Field(min_length=1)
+    is_published: bool = True
+
+    @field_validator("cover_image_url")
+    @classmethod
+    def cover_must_use_uploaded_media(cls, value: str | None) -> str | None:
+        """横图只能引用本站图片上传接口返回的路径，不能保存任意外站地址。"""
+
+        if value in (None, ""):
+            return None
+        if not value.startswith("/media/post_images/"):
+            raise ValueError("cover_image_url must be an uploaded post image")
+        return value
 
 
 class PostCreate(PostBase):
@@ -31,8 +45,22 @@ class PostUpdate(BaseModel):
     """帖子部分更新参数；没有传入的字段保持原值。"""
 
     title: str | None = Field(default=None, min_length=1, max_length=100)
+    summary: str | None = Field(default=None, max_length=300)
+    cover_image_url: str | None = Field(default=None, max_length=500)
     content: str | None = Field(default=None, min_length=1)
     category_id: int | None = Field(default=None, gt=0)
+    is_published: bool | None = None
+
+    @field_validator("cover_image_url")
+    @classmethod
+    def cover_must_use_uploaded_media(cls, value: str | None) -> str | None:
+        """允许传 null 移除横图；新地址必须来自站内帖子图片目录。"""
+
+        if value in (None, ""):
+            return None
+        if not value.startswith("/media/post_images/"):
+            raise ValueError("cover_image_url must be an uploaded post image")
+        return value
 
     @field_validator("category_id")
     @classmethod

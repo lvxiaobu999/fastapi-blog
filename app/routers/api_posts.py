@@ -103,6 +103,19 @@ async def list_posts(
     return success_response(request, data)
 
 
+@router.get("/admin", response_model=ApiSuccess[list[PostResponse]])
+async def list_admin_posts(
+    request: Request,
+    session: DbSession,
+    _current_user: AdminUser,
+    params: Annotated[PostQueryParams, Query()],
+) -> ApiSuccess[list[PostResponse]]:
+    """为后台帖子管理返回全部文章，包括已经下架的文章。"""
+
+    posts = await post_service.list_posts(session, params, include_unpublished=True)
+    return success_response(request, [PostResponse.model_validate(post) for post in posts])
+
+
 @router.get("/search", response_model=ApiSuccess[list[PostTitleSearchResult]])
 async def search_post_titles(
     request: Request,
@@ -120,7 +133,9 @@ async def search_post_titles(
 async def get_post(request: Request, post_id: int, session: DbSession) -> ApiSuccess[PostResponse]:
     """获取单个用户的公开信息。"""
 
-    post = await _get_post_or_404(session, post_id)
+    post = await post_service.get_post(session, post_id, include_unpublished=False)
+    if post is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     return success_response(request, PostResponse.model_validate(post))
 
 

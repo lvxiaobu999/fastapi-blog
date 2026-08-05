@@ -200,7 +200,7 @@ async def list_post_activity(
         await session.execute(
             select(Post, activity_column)
             .join(model, model.post_id == Post.id)
-            .where(model.user_id == user_id)
+            .where(model.user_id == user_id, Post.is_published.is_(True))
             .order_by(activity_column.desc(), model.id.desc())
             .limit(100)
         )
@@ -233,7 +233,7 @@ async def list_comment_activity(
         await session.execute(
             select(Comment, Post.title)
             .join(Post, Post.id == Comment.post_id)
-            .where(Comment.user_id == user_id)
+            .where(Comment.user_id == user_id, Post.is_published.is_(True))
             .order_by(Comment.created_at.desc(), Comment.id.desc())
             .limit(100)
         )

@@ -7,7 +7,7 @@ Post 通过 ``user_id`` 外键保存作者身份，通过 ``author`` 关系属�
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -26,7 +26,15 @@ class Post(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(100), nullable=False)
+    # 摘要用于列表快速介绍文章；允许为空以兼容历史文章，此时前端可回退截取正文。
+    summary: Mapped[str | None] = mapped_column(String(300), nullable=True, default=None)
+    # 横图由受保护的图片接口保存，这里只持久化站内相对 URL，不把二进制写入数据库。
+    cover_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # 下架只隐藏文章而不删除数据；历史文章迁移后保持上架，避免升级后全部消失。
+    is_published: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
     # 总浏览量允许匿名访问累加；server_default 保证历史文章迁移后从 0 开始。
     view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
 

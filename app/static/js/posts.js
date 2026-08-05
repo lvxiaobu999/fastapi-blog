@@ -66,6 +66,44 @@ $(function () {
 
     let editor = null;
     let previewViewer = null;
+    const coverInput = document.querySelector("#cover-image");
+    const coverUrlInput = document.querySelector("#cover_image_url");
+    const coverPreview = document.querySelector("[data-cover-preview]");
+    const coverPlaceholder = document.querySelector("[data-cover-placeholder]");
+    const coverRemoveButton = document.querySelector("[data-cover-remove]");
+    const coverFeedback = document.querySelector("[data-cover-feedback]");
+
+    function showCover(url) {
+        // 隐藏字段保存上传接口返回的站内 URL，提交文章时再与其他字段一起写入数据库。
+        coverUrlInput.value = url || "";
+        coverPreview.src = url || "";
+        coverPreview.hidden = !url;
+        coverPlaceholder.hidden = Boolean(url);
+        coverRemoveButton.classList.toggle("d-none", !url);
+    }
+
+    coverInput?.addEventListener("change", function () {
+        const file = this.files?.[0];
+        if (!file) return;
+        this.disabled = true;
+        coverFeedback.textContent = "横图上传中…";
+        uploadFile("/api/posts/images", "image", file)
+            .done((result) => {
+                showCover(result.url);
+                coverFeedback.textContent = "横图已上传，保存文章后生效。";
+            })
+            .fail((xhr) => {
+                coverFeedback.textContent = errorMessages(xhr);
+                this.value = "";
+            })
+            .always(() => { this.disabled = false; });
+    });
+
+    coverRemoveButton?.addEventListener("click", () => {
+        showCover("");
+        coverInput.value = "";
+        coverFeedback.textContent = "横图将在保存文章后移除。";
+    });
     // ---------- 编辑页：创建 Toast UI Editor，并把图片交给后端上传 ----------
     const editorElement = document.querySelector("#post-editor");
     if (editorElement && window.toastui?.Editor) {
@@ -102,6 +140,14 @@ $(function () {
         const emptyElement = document.querySelector("[data-preview-empty]");
 
         $("[data-preview-title]").text(title);
+        const summary = $("[data-post-form] [name=summary]").val().trim();
+        const coverUrl = coverUrlInput?.value || "";
+        const previewSummary = document.querySelector("[data-preview-summary]");
+        const previewCover = document.querySelector("[data-preview-cover]");
+        previewSummary.textContent = summary;
+        previewSummary.classList.toggle("d-none", !summary);
+        previewCover.src = coverUrl;
+        previewCover.classList.toggle("d-none", !coverUrl);
         emptyElement.classList.toggle("d-none", Boolean(markdown.trim()));
         previewElement.classList.toggle("d-none", !markdown.trim());
 
@@ -148,11 +194,14 @@ $(function () {
             data: {
                 title: $form.find("[name=title]").val(),
                 category_id: Number($form.find("[name=category_id]").val()),
+                summary: $form.find("[name=summary]").val().trim() || null,
+                cover_image_url: coverUrlInput?.value || null,
                 content: editor ? editor.getMarkdown() : $form.find("[name=content]").val(),
+                is_published: $form.find("[name=is_published]").prop("checked"),
             },
         }).done((post) => {
             // 服务端返回最终 ID 后进入详情页；页面重载会初始化只读 Viewer。
-            window.location.assign(`/posts/${post.id}`);
+            window.location.assign(post.is_published ? `/posts/${post.id}` : "/admin/posts");
         }).fail((xhr) => {
             // 失败时必须解除按钮锁，让用户修改内容后可以再次提交。
             setButtonLoading(button, false);

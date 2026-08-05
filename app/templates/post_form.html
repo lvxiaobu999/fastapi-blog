@@ -48,6 +48,35 @@
                 <div class="form-text">分类会显示在首页，并用于筛选对应文章。</div>
             </div>
             <div>
+                <label class="form-label" for="summary">摘要</label>
+                <textarea class="form-control" id="summary" name="summary" rows="3" maxlength="300"
+                          placeholder="简要介绍文章内容，最多 300 字">{{ post.summary | default('', true) if post | default(none) else '' }}</textarea>
+                <div class="form-text">用于文章列表快速了解内容；留空时列表会截取正文。</div>
+            </div>
+            <div class="post-cover-field">
+                <div class="form-label-row">
+                    <label class="form-label" for="cover-image">文章横图</label>
+                    <button class="btn btn-sm btn-outline-secondary{% if not post | default(none) or not post.cover_image_url %} d-none{% endif %}"
+                            type="button" data-cover-remove>移除横图</button>
+                </div>
+                <input id="cover_image_url" name="cover_image_url" type="hidden"
+                       value="{{ post.cover_image_url | default('', true) if post | default(none) else '' }}">
+                <label class="post-cover-uploader" for="cover-image" data-cover-uploader>
+                    <img src="{{ post.cover_image_url | default('', true) if post | default(none) else '' }}"
+                         alt="文章横图预览" data-cover-preview
+                         {% if not post | default(none) or not post.cover_image_url %}hidden{% endif %}>
+                    <span data-cover-placeholder{% if post | default(none) and post.cover_image_url %} hidden{% endif %}>选择一张横向图片</span>
+                    <input id="cover-image" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+                </label>
+                <div class="form-text" data-cover-feedback>建议使用 16:9 横图，文件不超过 5 MB。</div>
+            </div>
+            <div class="form-check form-switch post-publish-switch">
+                <input class="form-check-input" id="is_published" name="is_published" type="checkbox"
+                       {% if not post | default(none) or post.is_published %}checked{% endif %}>
+                <label class="form-check-label" for="is_published">立即上架</label>
+                <div class="form-text">关闭后文章保留在后台，但不会出现在公开列表、搜索和详情页。</div>
+            </div>
+            <div>
                 <label class="form-label" for="content">正文</label>
                 <div id="post-editor" class="post-editor"></div>
                 <textarea class="d-none" id="content" name="content">{{ post.content | default('') if post | default(none) else '' }}</textarea>
@@ -85,6 +114,8 @@
             </div>
             <div class="modal-body">
                 <h1 class="post-preview-heading" data-preview-title></h1>
+                <img class="post-preview-cover d-none" alt="" data-preview-cover>
+                <p class="post-preview-summary d-none" data-preview-summary></p>
                 <div class="post-content" id="post-preview-viewer"></div>
                 <p class="preview-empty d-none" data-preview-empty>正文还是空的，请先写一些内容。</p>
             </div>

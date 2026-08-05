@@ -104,7 +104,8 @@ async def list_comments(
 ) -> ApiSuccess[list[CommentResponse]]:
     """公开读取指定帖子的历史评论。"""
 
-    if await session.get(Post, post_id) is None:
+    post = await session.get(Post, post_id)
+    if post is None or not post.is_published:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     comments = await comment_service.list_comments(session, post_id)
     return success_response(
@@ -120,7 +121,8 @@ async def comment_websocket(websocket: WebSocket, post_id: int, session: DbSessi
     registered = False
     try:
         # URL 决定这条连接属于哪个帖子房间，不接受客户端在消息里更改 post_id。
-        if await session.get(Post, post_id) is None:
+        post = await session.get(Post, post_id)
+        if post is None or not post.is_published:
             await _send_websocket_error(websocket, "帖子不存在", close=True)
             return
 

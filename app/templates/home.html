@@ -26,6 +26,11 @@
         {% if posts %}
         {% for post in posts %}
         <article class="post-card">
+            {% if post.cover_image_url %}
+            <a class="post-card-cover" href="{{ url_for('post', post_id=post.id) }}" tabindex="-1" aria-hidden="true">
+                <img src="{{ post.cover_image_url }}" alt="">
+            </a>
+            {% endif %}
             <div class="author-avatar" aria-hidden="true">
                 {{ post.author.username[0] | upper }}
             </div>
@@ -42,7 +47,7 @@
                     </span>
                 </div>
                 <h2><a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a></h2>
-                <p class="post-excerpt">{{ post.content | striptags | truncate(180, true, '…') }}</p>
+                <p class="post-excerpt">{{ (post.summary or post.content) | striptags | truncate(180, true, '…') }}</p>
                 <a class="post-read-more" href="{{ url_for('post', post_id=post.id) }}">阅读全文 <span aria-hidden="true">→</span></a>
             </div>
         </article>

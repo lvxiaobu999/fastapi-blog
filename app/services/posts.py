@@ -50,7 +50,10 @@ async def create_post(session: AsyncSession, data: PostCreate) -> Post:
 
     post = Post(
         title=data.title,
+        summary=data.summary,
+        cover_image_url=data.cover_image_url,
         content=data.content,
+        is_published=data.is_published,
         # 通过关系属性赋值后，SQLAlchemy 会在 flush 时同步填写外键；这样返回对象也已经
         # 持有作者和分类，不需要在响应序列化阶段触发异步懒加载。
         author=author,
@@ -98,7 +101,9 @@ async def update_post(session: AsyncSession, post: Post, data: PostUpdate) -> Po
     return updated_post
 
 
-async def get_post(session: AsyncSession, post_id: int) -> Post | None:
+async def get_post(
+    session: AsyncSession, post_id: int, *, include_unpublished: bool = True
+) -> Post | None:
     """为详情、编辑、评论和互动入口提供同一份“可用文章”查询。
 
     这些功能在继续执行前都必须按 URL 中的 ID 找到文章，并需要作者/分类用于响应渲染。
@@ -110,6 +115,8 @@ async def get_post(session: AsyncSession, post_id: int) -> Post | None:
         .options(selectinload(Post.author), selectinload(Post.category))
         .where(Post.id == post_id)
     )
+    if not include_unpublished:
+        statement = statement.where(Post.is_published.is_(True))
     return await session.scalar(statement)
 
 
@@ -123,7 +130,12 @@ def _escape_like_keyword(keyword: str) -> str:
     return keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-async def list_posts(session: AsyncSession, params: PostQueryParams) -> list[Post]:
+async def list_posts(
+    session: AsyncSession,
+    params: PostQueryParams,
+    *,
+    include_unpublished: bool = False,
+) -> list[Post]:
     """为搜索结果页、分类结果页和后台文章列表生成帖子集合。
 
     首页点击搜索时携带 keyword 跳到列表页，点击类型 Tag 时携带 category；后台也复用列表。
@@ -134,6 +146,9 @@ async def list_posts(session: AsyncSession, params: PostQueryParams) -> list[Pos
     statement = select(Post).options(
         selectinload(Post.author), selectinload(Post.category)
     )
+    if not include_unpublished:
+        # 公开搜索、分类和首页只展示上架文章；后台通过显式可信参数读取全部。
+        statement = statement.where(Post.is_published.is_(True))
 
     # 去除首尾空格后为空，等同于没有关键词；避免 "%%" 这类无意义过滤条件。
     keyword = params.keyword.strip() if params.keyword is not None else None
@@ -181,6 +196,7 @@ async def search_post_titles(
         # 搜索下拉只需要跳转主键和标题，避免每次按键都读取正文及关联对象。
         .options(load_only(Post.id, Post.title))
         .where(Post.title.ilike(pattern, escape="\\"))
+        .where(Post.is_published.is_(True))
         .order_by(Post.created_at.desc(), Post.id.desc())
         .limit(params.limit)
     )

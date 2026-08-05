@@ -105,7 +105,7 @@ def test_comment_websocket_authenticates_and_broadcasts(monkeypatch: pytest.Monk
     from app.routers import comments as comments_router
 
     user = SimpleNamespace(id=7)
-    post = SimpleNamespace(id=11)
+    post = SimpleNamespace(id=11, is_published=True)
 
     class FakeSession:
         async def get(self, model, key):

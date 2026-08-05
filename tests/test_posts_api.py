@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models import User
 from app.schemas.post import PostCreate
+from app.services.auth import create_access_token
 from app.services.posts import create_post
 
 pytestmark = pytest.mark.anyio
@@ -124,3 +125,88 @@ async def test_list_posts_rejects_invalid_pagination(
         "limit",
         "category",
     }
+
+
+async def test_admin_can_list_and_toggle_unpublished_post(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seeded_categories: dict[str, int],
+) -> None:
+    """公开接口隐藏下架文章，管理员仍可管理并重新上架。"""
+
+    async with session_factory() as session:
+        admin = User(
+            username="post_admin",
+            email="post_admin@example.com",
+            hashed_password="hash",
+            is_admin=True,
+        )
+        session.add(admin)
+        await session.commit()
+        await session.refresh(admin)
+        post = await create_post(
+            session,
+            PostCreate(
+                title="Temporary draft",
+                summary="Not public yet",
+                cover_image_url="/media/post_images/draft.png",
+                content="Draft body",
+                category_id=seeded_categories["fastapi"],
+                user_id=admin.id,
+                is_published=False,
+            ),
+        )
+        admin_id, post_id = admin.id, post.id
+
+    headers = {"Authorization": f"Bearer {create_access_token(admin_id)}"}
+    public_list = await client.get("/api/posts", params={"keyword": "Temporary"})
+    public_detail = await client.get(f"/api/posts/{post_id}")
+    unauthenticated_admin_list = await client.get("/api/posts/admin")
+    admin_list = await client.get("/api/posts/admin", headers=headers)
+    published = await client.patch(
+        f"/api/posts/{post_id}", headers=headers, json={"is_published": True}
+    )
+    visible_detail = await client.get(f"/api/posts/{post_id}")
+
+    assert public_list.json()["data"] == []
+    assert public_detail.status_code == 404
+    assert unauthenticated_admin_list.status_code == 401
+    assert admin_list.status_code == 200
+    assert admin_list.json()["data"][0]["is_published"] is False
+    assert admin_list.json()["data"][0]["summary"] == "Not public yet"
+    assert published.status_code == 200
+    assert published.json()["data"]["is_published"] is True
+    assert visible_detail.status_code == 200
+
+
+async def test_post_rejects_external_cover_url(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seeded_categories: dict[str, int],
+) -> None:
+    """横图必须先经过站内上传接口，不能直接保存任意外部 URL。"""
+
+    async with session_factory() as session:
+        admin = User(
+            username="cover_admin",
+            email="cover_admin@example.com",
+            hashed_password="hash",
+            is_admin=True,
+        )
+        session.add(admin)
+        await session.commit()
+        await session.refresh(admin)
+        admin_id = admin.id
+
+    response = await client.post(
+        "/api/posts",
+        headers={"Authorization": f"Bearer {create_access_token(admin_id)}"},
+        json={
+            "title": "Unsafe cover",
+            "content": "Body",
+            "category_id": seeded_categories["fastapi"],
+            "cover_image_url": "https://tracker.example/cover.png",
+        },
+    )
+
+    assert response.status_code == 422

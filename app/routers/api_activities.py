@@ -24,7 +24,7 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 async def _post_or_404(session: AsyncSession, post_id: int):
     """读取文章或转换为统一的 404。"""
 
-    post = await post_service.get_post(session, post_id)
+    post = await post_service.get_post(session, post_id, include_unpublished=False)
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     return post
