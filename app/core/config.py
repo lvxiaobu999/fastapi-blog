@@ -57,10 +57,14 @@ class Settings(BaseSettings):
     # text 适合人在终端阅读；json 适合 Loki、ELK 和云日志平台按字段查询。
     log_format: LogFormat = "text"
     # 容器生产环境建议保持 False 并采集 stdout；仅单机部署且没有采集器时写文件。
-    log_to_file: bool = True
-    # 仅 LOG_TO_FILE=true 时生效；相对路径以启动进程的工作目录为基准。
-    log_file_path: str = "logs/app.log"
-    # 文件日志每天 UTC 零点轮转，超过该数量的历史文件会由 Handler 自动删除。
+    log_to_file: bool = False
+    # 仅 LOG_TO_FILE=true 时生效；其下创建 app 完整链路和 error 故障副本两个目录。
+    log_directory: str = "logs"
+    # 单个日期文件达到该字节数后生成 .1、.2 等备份，防止高流量日期产生超大文件。
+    log_max_bytes: int = Field(default=20 * 1024 * 1024, ge=1024)
+    # 每个日志通道每天最多保留的文件数量，包含正在写入的 YYYY-MM-DD.log。
+    log_files_per_day: int = Field(default=5, ge=2, le=100)
+    # 按 UTC 日期保留日志；切换到新日期时自动删除更早的日期文件。
     log_retention_days: int = Field(default=14, ge=1, le=365)
 
     @model_validator(mode="after")

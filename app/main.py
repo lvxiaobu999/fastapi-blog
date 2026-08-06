@@ -25,6 +25,9 @@ from app.templating import APP_DIR
 
 settings = get_settings()
 configure_logging(settings)
+# 参数不是输出文本，而是 Logger 的稳定名称。"app.access" 表示 app 命名空间下专门记录
+# HTTP 访问事件的子 Logger；JSON 中 logger 字段会显示该名称，线上可以据此单独筛选、
+# 调整等级或路由到其他 Handler。它默认把事件向上传播给 configure_logging 配置的 root。
 access_logger = logging.getLogger("app.access")
 
 

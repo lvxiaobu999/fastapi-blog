@@ -36,8 +36,10 @@ Loguru 更容易上手，structlog 更擅长结构化上下文，但 FastAPI、U
 | `LOG_LEVEL` | `INFO` | `DEBUG` 更详细；`WARNING` 会隐藏正常访问日志 |
 | `LOG_FORMAT` | `text` | 本地使用 `text`，日志平台使用 `json` |
 | `LOG_TO_FILE` | `false` | `false` 写 stdout；`true` 写轮转文件 |
-| `LOG_FILE_PATH` | `logs/app.log` | 文件模式的目标路径 |
-| `LOG_RETENTION_DAYS` | `14` | 文件按 UTC 日期轮转后保留的历史文件数量 |
+| `LOG_DIRECTORY` | `logs` | 文件模式根目录，其下创建 app 和 error 两个通道 |
+| `LOG_MAX_BYTES` | `20971520` | 单个日期文件达到该大小后进行大小轮转 |
+| `LOG_FILES_PER_DAY` | `5` | 单通道单日包含当前文件在内的文件数上限 |
+| `LOG_RETENTION_DAYS` | `14` | 按 UTC 日期保留的天数 |
 
 配置优先级仍为“系统环境变量 > `.env.<环境>` > `.env` > Settings 默认值”。修改后必须重启应用进程。
 
@@ -112,11 +114,13 @@ FastAPI stdout(JSON)
 
 ```dotenv
 LOG_TO_FILE=true
-LOG_FILE_PATH=logs/app.log
+LOG_DIRECTORY=logs
+LOG_MAX_BYTES=20971520
+LOG_FILES_PER_DAY=5
 LOG_RETENTION_DAYS=30
 ```
 
-应用使用 `TimedRotatingFileHandler` 在 UTC 零点轮转。`backupCount=30` 会在发生轮转时删除更早的历史文件。它不等于严格的“创建满 30×24 小时立即删除”，并且多进程同时写同一文件可能竞争；多 Worker 或容器部署应改用 stdout 加外部采集器。
+应用把完整时间线写入 `logs/app/YYYY-MM-DD.log`，并把 ERROR/CRITICAL 额外复制到 `logs/error/YYYY-MM-DD.log`。同一天达到 `LOG_MAX_BYTES` 后追加 `.1` 等大小轮转文件，`LOG_FILES_PER_DAY` 限制单通道单日总文件数。日期切换后的首次写入会删除保留窗口外的历史文件。多 Worker 仍可能竞争本地轮转文件，因此容器部署应改用 stdout 加外部采集器。
 
 ## 7. 企业应用如何维护日志等级和内容
 
