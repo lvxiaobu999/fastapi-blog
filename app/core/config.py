@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 COMMON_ENV_FILE = PROJECT_ROOT / ".env"
 
 Environment = Literal["development", "production"]
+LogFormat = Literal["text", "json"]
 
 
 def _selected_environment() -> str:
@@ -51,6 +52,16 @@ class Settings(BaseSettings):
     refresh_idle_timeout_minutes: int = Field(default=30, ge=1)
     # 本地 HTTP 调试设为 False；生产 HTTPS 必须设为 True，防止 Cookie 明文传输。
     auth_cookie_secure: bool = False
+    # 开发环境通常使用 DEBUG/INFO，生产环境建议 INFO；设为 WARNING 会隐藏正常访问日志。
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    # text 适合人在终端阅读；json 适合 Loki、ELK 和云日志平台按字段查询。
+    log_format: LogFormat = "text"
+    # 容器生产环境建议保持 False 并采集 stdout；仅单机部署且没有采集器时写文件。
+    log_to_file: bool = True
+    # 仅 LOG_TO_FILE=true 时生效；相对路径以启动进程的工作目录为基准。
+    log_file_path: str = "logs/app.log"
+    # 文件日志每天 UTC 零点轮转，超过该数量的历史文件会由 Handler 自动删除。
+    log_retention_days: int = Field(default=14, ge=1, le=365)
 
     @model_validator(mode="after")
     def validate_database_for_environment(self) -> "Settings":

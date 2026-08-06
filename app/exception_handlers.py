@@ -163,6 +163,7 @@ async def unexpected_exception_handler(request: Request, exc: Exception) -> Resp
         "Unhandled exception while processing %s %s",
         request.method,
         request.url.path,
+        extra={"request_id": str(getattr(request.state, "request_id", "-"))},
         exc_info=(type(exc), exc, exc.__traceback__),
     )
     if _is_api_request(request):

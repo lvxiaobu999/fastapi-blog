@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+import logging
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -7,6 +9,7 @@ from starlette.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from app.core import get_settings
+from app.core.logging import bind_request_id, configure_logging, reset_request_id
 from app.db.session import engine
 from app.exception_handlers import register_exception_handlers
 from app.routers import (
@@ -21,6 +24,8 @@ from app.routers import (
 from app.templating import APP_DIR
 
 settings = get_settings()
+configure_logging(settings)
+access_logger = logging.getLogger("app.access")
 
 
 @asynccontextmanager
@@ -36,13 +41,30 @@ app = FastAPI(title=settings.project_title, lifespan=lifespan)
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """为每个请求生成追踪 ID，并在响应正文元数据与 Header 之间保持一致。"""
+    """生成请求 ID，并记录可按请求关联查询的访问日志与处理耗时。"""
 
     # 服务端生成 ID，避免客户端伪造标识导致日志中的不同请求互相混淆。
     request.state.request_id = uuid4()
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = str(request.state.request_id)
-    return response
+    context_token = bind_request_id(request.state.request_id)
+    started_at = perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-ID"] = str(request.state.request_id)
+        return response
+    finally:
+        # 不记录查询参数和请求体，避免搜索词、Token、密码等敏感内容进入长期日志。
+        access_logger.info(
+            "HTTP request completed",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": status_code,
+                "duration_ms": round((perf_counter() - started_at) * 1000, 2),
+            },
+        )
+        reset_request_id(context_token)
 
 
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")

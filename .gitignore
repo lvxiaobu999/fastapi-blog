@@ -25,3 +25,8 @@ app/media/**
 
 # 个人学习示例文档，不进入项目版本控制
 /docs_example/
+
+# 本地运行日志
+logs/
+*.log
+*.log.*
