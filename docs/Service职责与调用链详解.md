@@ -150,38 +150,43 @@ Service 在 Session 有效时提前把响应所需关系加载好，Pydantic 后
 - 返回：`sub` 转换后的整数用户 ID。
 - 失败：保留 PyJWT 异常，由 Depends 或 WebSocket Router 转成统一认证失败。
 
-### `_hash_refresh_token(token)`
+Refresh 生命周期已经从 `auth.py` 移到 `refresh_sessions.py`。这样 Access JWT 编解码不依赖
+Redis，只有登录、刷新、退出和账户安全事件进入有状态会话层。
 
-- 入口：Refresh Session 创建、查询和轮换。
-- 工作：SHA-256 计算固定长度摘要。
-- 原因：浏览器保存原始 Refresh Token，数据库只保存摘要；数据库泄露后摘要不能直接当 Cookie 使用。
+## 3.1 `refresh_sessions.py`：Redis Refresh 会话
 
-### `_utc(value)`
+文件：[app/services/refresh_sessions.py](../app/services/refresh_sessions.py)
 
-- 入口：刷新会话过期判断。
-- 工作：把 SQLite 可能返回的无时区时间和 PostgreSQL 带时区时间统一成 UTC。
-- 原因：Python 不允许直接比较无时区和带时区 `datetime`。
+### `_digest(raw_token)`
 
-### `create_refresh_session(session, user_id)`
+- 入口：创建、刷新和撤销。
+- 工作：把 Cookie 随机串转换为 SHA-256 摘要。
+- 目的：Redis 泄露时，攻击者不能直接把 Key 中摘要作为 Refresh Cookie 使用。
 
-- 入口：登录、Refresh Token 轮换。
-- 工作：生成高熵随机 Token；数据库保存哈希、绝对过期时间、最近活动时间。
-- 事务：内部 `commit()`。
-- 返回：只返回原始 Token 给 Router 写入 HttpOnly Cookie。
+### `create_refresh_session(redis, user_id)`
 
-### `rotate_refresh_session(session, raw_token)`
+- 入口：登录成功。
+- 工作：生成高熵 Token，Redis 原子写入会话 JSON、TTL 和用户会话索引。
+- 返回：原始 Token 只交给 Router 写 HttpOnly Cookie。
+- 不访问业务数据库，也不创建 SQLAlchemy 事务。
+
+### `rotate_refresh_session(redis, raw_token)`
 
 - 入口：`POST /api/auth/refresh`。
-- 工作：查询 Token 哈希；检查撤销、绝对过期和空闲过期；撤销旧会话并创建新会话。
-- 返回：成功为 `(user_id, new_token)`，失败为 `None`。
-- 目的：Refresh Token 使用后立即轮换，旧 Cookie 不能反复兑换 Access Token。
+- 工作：检查绝对/空闲期限，用 Lua 原子删除旧 Key 并创建新 Key。
+- 返回：成功为 `(user_id, new_token)`，失效或重放返回 `None`。
+- 新会话继承首次登录的绝对期限，不能靠持续刷新无限续命。
 
-### `touch_refresh_session(session, raw_token, user_id)`
+### `revoke_refresh_session(redis, raw_token)`
 
-- 入口：`get_current_user()` 发现请求带 Refresh Cookie 时。
-- 工作：确认 Cookie 与 Access Token 属于同一用户；检查过期；更新最近活动时间。
-- 返回：有效为 `True`，不存在、已撤销、错用户或过期为 `False`。
-- 事务：更新活动时间或撤销状态时 `commit()`。
+- 入口：退出登录、刷新后发现用户已被删除。
+- 工作：幂等删除当前会话 Key，并从用户索引移除摘要。
+
+### `revoke_user_refresh_sessions(redis, user_id)`
+
+- 入口：修改密码、管理员删除用户。
+- 工作：读取用户会话索引，通过 Redis事务删除全部设备会话和索引。
+- 目的：账户安全状态变化后不能再用旧 Refresh Token 恢复登录。
 
 ## 4. `users.py`：用户业务和数据访问
 

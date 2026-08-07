@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core import get_settings
 from app.core.logging import bind_request_id, configure_logging, reset_request_id
 from app.db.session import engine
+from app.db.redis import close_redis
 from app.exception_handlers import register_exception_handlers
 from app.routers import (
     api_activities_router,
@@ -36,6 +37,7 @@ async def lifespan(_app: FastAPI):
     """应用退出时释放异步数据库连接池。"""
 
     yield
+    await close_redis()
     await engine.dispose()
 
 

@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 import pytest
+from fakeredis.aioredis import FakeRedis
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -13,8 +14,29 @@ from app.services.auth import (
     verify_access_token,
     verify_password,
 )
+from app.services.refresh_sessions import (
+    create_refresh_session,
+    revoke_refresh_session,
+    revoke_user_refresh_sessions,
+)
 
 pytestmark = pytest.mark.anyio
+
+
+async def test_refresh_session_service_accepts_binary_redis_responses() -> None:
+    """即使 Redis 未自动解码 bytes，会话 JSON 与摘要也应在 Service 边界正确转换。"""
+
+    redis = FakeRedis(decode_responses=False)
+    try:
+        current_token = await create_refresh_session(redis, user_id=1)
+        await revoke_refresh_session(redis, current_token)
+        assert not [key async for key in redis.scan_iter("*:auth:*")]
+
+        await create_refresh_session(redis, user_id=1)
+        await revoke_user_refresh_sessions(redis, user_id=1)
+        assert not [key async for key in redis.scan_iter("*:auth:*")]
+    finally:
+        await redis.aclose()
 
 
 async def register(client: AsyncClient, username: str = "alice") -> dict:
@@ -104,6 +126,43 @@ async def test_refresh_rotates_cookie_and_logout_clears_it(client: AsyncClient) 
     logout = await client.post("/api/auth/logout")
     assert logout.status_code == 200
     assert logout.json()["data"] is None
+
+    # 退出不仅清 Cookie，还会删除 Redis Key；即使攻击者保留旧 Cookie 也不能再次刷新。
+    replay_after_logout = await client.post(
+        "/api/auth/refresh",
+        headers={"Cookie": f"refresh_token={refreshed.cookies.get('refresh_token')}"},
+    )
+    assert replay_after_logout.status_code == 401
+
+
+async def test_rotated_refresh_token_cannot_be_replayed(client: AsyncClient) -> None:
+    """轮换使用一次后立即删除旧 Redis Key，并发或重放请求只能有一次成功。"""
+
+    await register(client)
+    old_token = (await login(client)).cookies.get("refresh_token")
+    assert old_token
+
+    cookie_header = {"Cookie": f"refresh_token={old_token}"}
+    first_refresh = await client.post("/api/auth/refresh", headers=cookie_header)
+    replay = await client.post("/api/auth/refresh", headers=cookie_header)
+
+    assert first_refresh.status_code == 200
+    assert replay.status_code == 401
+
+
+async def test_redis_stores_digest_with_ttl_not_raw_refresh_token(
+    client: AsyncClient, fake_redis: FakeRedis
+) -> None:
+    """Redis Key 不暴露 Cookie 明文，并由 TTL 自动清理过期会话。"""
+
+    await register(client)
+    raw_token = (await login(client)).cookies.get("refresh_token")
+    keys = [key async for key in fake_redis.scan_iter("*:auth:refresh:*")]
+
+    assert raw_token
+    assert len(keys) == 1
+    assert raw_token not in keys[0]
+    assert await fake_redis.ttl(keys[0]) > 0
 
 
 async def test_current_session_requires_a_valid_access_token(client: AsyncClient) -> None:
@@ -217,7 +276,9 @@ async def test_change_password_requires_current_password(client: AsyncClient) ->
     """修改密码必须验证旧密码，成功后新密码可以用于登录。"""
 
     await register(client)
-    token = (await login(client)).json()["data"]["access_token"]
+    login_response = await login(client)
+    token = login_response.json()["data"]["access_token"]
+    old_refresh = login_response.cookies.get("refresh_token")
     headers = {"Authorization": f"Bearer {token}"}
     wrong = await client.post(
         "/api/auth/password",
@@ -240,5 +301,9 @@ async def test_change_password_requires_current_password(client: AsyncClient) ->
 
     assert wrong.status_code == 400
     assert changed.status_code == 200
+    revoked = await client.post(
+        "/api/auth/refresh", headers={"Cookie": f"refresh_token={old_refresh}"}
+    )
+    assert revoked.status_code == 401
     assert (await login(client, password="password123")).status_code == 401
     assert (await login(client, password="newpassword123")).status_code == 200

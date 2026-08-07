@@ -20,6 +20,8 @@ dependencies = [
     "pydantic-settings>=2.14.2",
     # JWT 编码与解码；不能替代密码哈希或 HTTPS。
     "pyjwt>=2.13.0",
+    # 官方 Redis 客户端；redis.asyncio 提供 Refresh Session 使用的异步连接池。
+    "redis>=8.1.0",
     # ORM、Engine 和 Session 基础设施。
     "sqlalchemy>=2.0.51",
 ]
@@ -42,6 +44,7 @@ pythonpath = ["."]
 [dependency-groups]
 # 仅开发和测试需要的工具，不属于生产运行依赖。
 dev = [
+    "fakeredis[lua]>=2.37.0",
     "pytest>=9.1.1",
 ]
 

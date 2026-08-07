@@ -3,6 +3,7 @@
 from collections.abc import AsyncIterator
 
 import pytest
+from fakeredis.aioredis import FakeRedis
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -13,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
 from app.db.session import get_db
+from app.db.redis import get_redis
 from app.main import app
 from app.models import Category
 
@@ -62,8 +64,20 @@ async def seeded_categories(
 
 
 @pytest.fixture
+async def fake_redis() -> AsyncIterator[FakeRedis]:
+    """为每个测试提供独立内存 Redis，并在用例结束后关闭连接。"""
+
+    client = FakeRedis(decode_responses=True)
+    try:
+        yield client
+    finally:
+        await client.aclose()
+
+
+@pytest.fixture
 async def client(
     session_factory: async_sessionmaker[AsyncSession],
+    fake_redis: FakeRedis,
 ) -> AsyncIterator[AsyncClient]:
     """覆盖真实数据库依赖，并通过 ASGI 异步调用 FastAPI。"""
 
@@ -71,10 +85,17 @@ async def client(
         async with session_factory() as session:
             yield session
 
+    async def override_get_redis() -> AsyncIterator[FakeRedis]:
+        """每个测试客户端使用独立内存 Redis，避免依赖本机服务或共享历史会话。"""
+
+        yield fake_redis
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_redis] = override_get_redis
     transport = ASGITransport(app=app)
     try:
         async with AsyncClient(transport=transport, base_url="http://test") as test_client:
             yield test_client
     finally:
         app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_redis, None)

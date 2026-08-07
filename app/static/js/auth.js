@@ -137,8 +137,13 @@ $(function () {
                 confirm_password: $form.find("[name=confirm_password]").val(),
             },
         }).done(() => {
-            showFeedback($form, "密码修改成功。", "success");
+            // 后端已经撤销该用户全部 Redis Refresh Session。无状态 Access JWT 无法由
+            // Redis 立即撤销，因此前端同步删除本地 Access Token，并刷新成游客状态。
+            clearToken();
+            setAuthState(false);
+            showFeedback($form, "密码修改成功，请重新登录。", "success");
             $form[0].reset();
+            window.setTimeout(() => window.location.reload(), 600);
         }).fail((xhr) => showFeedback($form, errorMessages(xhr)))
             .always(() => setButtonLoading(button, false));
     });

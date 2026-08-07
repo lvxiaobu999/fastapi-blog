@@ -2,6 +2,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from dotenv import dotenv_values
 from pydantic import Field, SecretStr, model_validator
@@ -48,10 +49,17 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=30, ge=1)
     # Refresh Session 的最长寿命；即使用户持续操作，也不会超过这个绝对上限。一般设置一个月 = 30 * 24 * 60
     refresh_token_expire_minutes: int = Field(default=7 * 24 * 60, ge=1)
-    # 连续无请求超过该时间后，Refresh Token 不能再换取新的 Access Token。一般设置7天 = 7 * 24 * 60
-    refresh_idle_timeout_minutes: int = Field(default=30, ge=1)
+    # 现在只在“刷新 Token”时更新活动时间，不让普通 Access JWT 请求依赖 Redis；因此空闲
+    # 期限必须显著长于 Access 有效期。默认 24 小时无刷新后要求重新登录。
+    refresh_idle_timeout_minutes: int = Field(default=24 * 60, ge=1)
     # 本地 HTTP 调试设为 False；生产 HTTPS 必须设为 True，防止 Cookie 明文传输。
     auth_cookie_secure: bool = False
+    # Redis 保存有状态 Refresh Session。SecretStr 防止带密码的生产 URL 出现在配置 repr。
+    redis_url: SecretStr = SecretStr("redis://localhost:6379/0")
+    # Key 前缀隔离同一 Redis 数据库中的不同应用和环境；修改后旧会话会自然失效。
+    redis_key_prefix: str = "fastapi-blog"
+    # Redis 故障应快速失败并由 API 返回 503，不能让登录/刷新请求长时间挂起。
+    redis_socket_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
     # 开发环境通常使用 DEBUG/INFO，生产环境建议 INFO；设为 WARNING 会隐藏正常访问日志。
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     # text 适合人在终端阅读；json 适合 Loki、ELK 和云日志平台按字段查询。
@@ -73,6 +81,17 @@ class Settings(BaseSettings):
             raise ValueError("Development DATABASE_URL must use SQLite with aiosqlite")
         if self.env == "production" and not self.database_url.startswith("postgresql+psycopg://"):
             raise ValueError("Production DATABASE_URL must use PostgreSQL with psycopg")
+        if self.refresh_idle_timeout_minutes <= self.access_token_expire_minutes:
+            raise ValueError("REFRESH_IDLE_TIMEOUT_MINUTES must exceed ACCESS_TOKEN_EXPIRE_MINUTES")
+        redis_url = self.redis_url.get_secret_value()
+        if not redis_url.startswith(("redis://", "rediss://")):
+            raise ValueError("REDIS_URL must use redis:// or rediss://")
+        if self.env == "production" and urlsplit(redis_url).hostname in {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }:
+            raise ValueError("Production REDIS_URL must be provided by the deployment environment")
         return self
 
 

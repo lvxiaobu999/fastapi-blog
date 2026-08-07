@@ -9,9 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core import get_settings
 from app.db.base import Base
-from app.models import (  # noqa: F401
-    Category, Comment, Post, PostFavorite, PostLike, PostView, RefreshSession, User,
-)
+from app.models import Category, Comment, Post, PostFavorite, PostLike, PostView, User  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

@@ -1,0 +1,23 @@
+# 本文件只启动本地开发 Redis。生产环境应使用带 ACL/密码、TLS、备份和高可用的托管
+# Redis 或独立部署，不要直接复制此无密码配置到公网服务器。
+services:
+  redis:
+    image: redis:7.4.2-alpine
+    container_name: fastapi-blog-redis-dev
+    # 只映射到本机回环地址，局域网和公网不能直接访问开发 Redis。
+    ports:
+      - "127.0.0.1:6379:6379"
+    # AOF 每秒刷盘；开发机重启容器后仍能保留尚未过期的 Refresh Session。
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - fastapi_blog_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  # docker compose down 不删除该卷；只有显式 down -v 才会删除，后者属于破坏性操作。
+  fastapi_blog_redis_data:

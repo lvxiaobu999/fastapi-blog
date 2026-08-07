@@ -11,6 +11,7 @@ from typing import cast
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from redis.exceptions import RedisError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ExceptionHandler
 
@@ -29,6 +30,7 @@ _ERROR_CODES = {
     409: 40901,
     422: 42201,
     500: 50001,
+    503: 50301,
 }
 
 _PAGE_TEMPLATES = {
@@ -181,6 +183,34 @@ async def unexpected_exception_handler(request: Request, exc: Exception) -> Resp
     )
 
 
+async def redis_exception_handler(request: Request, exc: RedisError) -> Response:
+    """Redis 不可用时记录内部错误并返回 503，不把连接地址或凭据暴露给客户端。"""
+
+    logger.error(
+        "Redis unavailable while processing %s %s",
+        request.method,
+        request.url.path,
+        extra={"request_id": str(getattr(request.state, "request_id", "-"))},
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+    if _is_api_request(request):
+        return api_error_response(
+            request=request,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            message="Authentication service temporarily unavailable",
+        )
+    return templates.TemplateResponse(
+        request,
+        "error.html",
+        {
+            "title": "服务暂时不可用",
+            "status_code": status.HTTP_503_SERVICE_UNAVAILABLE,
+            "message": "认证服务暂时不可用，请稍后重试。",
+        },
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """在 FastAPI 应用上注册异常类型与统一处理函数的映射。"""
 
@@ -195,6 +225,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         RequestValidationError,
         cast(ExceptionHandler, validation_exception_handler),
     )
+    app.add_exception_handler(RedisError, cast(ExceptionHandler, redis_exception_handler))
     app.add_exception_handler(
         Exception,
         cast(ExceptionHandler, unexpected_exception_handler),

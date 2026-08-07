@@ -9,7 +9,6 @@ from app.db.base import Base
 if TYPE_CHECKING:
     # 仅用于静态类型提示，避免 User 与 Post 在运行时循环导入。
     from app.models.post import Post
-    from app.models.refresh_session import RefreshSession
     from app.models.comment import Comment
 
 
@@ -55,9 +54,6 @@ class User(Base):
         passive_deletes=True,
     )
 
-    refresh_sessions: Mapped[list["RefreshSession"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
     comments: Mapped[list["Comment"]] = relationship(
         back_populates="author", cascade="all, delete-orphan", passive_deletes=True
     )

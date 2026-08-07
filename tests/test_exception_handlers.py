@@ -5,11 +5,13 @@ import json
 import pytest
 from fastapi import Request
 from httpx import AsyncClient
+from redis.exceptions import ConnectionError as RedisConnectionError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.exception_handlers import (
     http_exception_handler,
     unexpected_exception_handler,
+    redis_exception_handler,
 )
 from app.main import app
 
@@ -105,3 +107,17 @@ async def test_unexpected_errors_hide_details_from_api_and_page() -> None:
     assert page_response.status_code == 500
     assert "服务器暂时出现异常".encode() in page_response.body
     assert "database password leaked".encode() not in page_response.body
+
+
+async def test_redis_errors_return_safe_503_response() -> None:
+    """Redis 连接详情只写服务端日志，认证 API 对客户端返回稳定 503。"""
+
+    response = await redis_exception_handler(
+        _request("/api/auth/token"), RedisConnectionError("redis://secret@internal:6379")
+    )
+    body = json.loads(response.body)
+
+    assert response.status_code == 503
+    assert body["code"] == 50301
+    assert body["message"] == "Authentication service temporarily unavailable"
+    assert "secret" not in response.body.decode()

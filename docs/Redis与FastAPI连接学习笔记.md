@@ -31,14 +31,15 @@ Redis 容器
 
 ## 2. 当前仓库状态
 
-当前仓库尚未接入 Redis：
+当前仓库已经接入 Redis：
 
 - 没有 `compose.yaml` 或 `docker-compose.yml`。
-- `pyproject.toml` 尚未安装 Python `redis` 客户端。
-- `Settings` 尚未声明 `redis_url`。
-- `app/main.py` 尚未在生命周期中创建和关闭 Redis 连接池。
+- `pyproject.toml` 已安装官方 `redis` 异步客户端。
+- `Settings` 已声明 Redis URL、Key 前缀与连接超时。
+- `app/db/redis.py` 提供共享连接池，`app/main.py` 在退出时关闭连接。
+- Refresh Session 已迁移到 Redis；评论 Pub/Sub 与限流仍是后续上线任务。
 
-所以下面的代码是下一步接入模板，不代表当前应用已经在使用 Redis。
+下面的连接与 Docker 内容既可用于理解当前认证会话，也可作为后续 Pub/Sub 的部署参考。
 
 ## 3. 最容易混淆的连接地址
 
@@ -51,6 +52,16 @@ REDIS_URL=redis://localhost:6379/0
 ```
 
 这里的 `localhost` 是运行 FastAPI 的 Windows 主机。
+
+当前仓库提供本地开发 Compose：
+
+```powershell
+docker compose -f compose.redis.development.yaml up -d
+docker compose -f compose.redis.development.yaml ps
+docker compose -f compose.redis.development.yaml exec redis redis-cli ping
+```
+
+该配置只绑定 `127.0.0.1` 并启用 AOF，不设置密码，仅限开发机使用。生产环境不能照搬。
 
 ### FastAPI 和 Redis 都在同一个 Compose
 
@@ -359,15 +370,15 @@ docker compose exec redis redis-cli TTL post:1
 | 修改文章后仍看到旧内容 | 缓存未失效或 TTL 太长 | 写操作后 `DEL`、检查 TTL |
 | 单 Worker 正常，多 Worker 推送丢失 | WebSocket 房间只在进程内存中 | Redis Pub/Sub 跨进程转发 |
 
-## 14. 推荐接入顺序
+## 14. 当前验证与后续顺序
 
-1. 先用 Compose 只启动 Redis，并确认 `redis-cli ping` 返回 `PONG`。
-2. 执行 `uv add redis`。
-3. 为 `Settings` 增加 `redis_url`，开发环境使用 `localhost`。
-4. 新增共享异步客户端和 `get_redis` 依赖。
-5. 在 lifespan 中执行 `ping()` 和 `aclose()`。
-6. 先写一个健康检查或最小缓存测试，确认连接链路。
-7. 再选择具体业务接入缓存、限流或 WebSocket Pub/Sub。
-8. 为 Redis 不可用、缓存命中、未命中、过期和失效行为增加测试。
+1. 启动 Redis，并确认 `redis-cli ping` 返回 `PONG`。
+2. 启动 FastAPI，登录后检查 Refresh Session Key 和 TTL。
+3. 刷新一次，确认旧 Key 删除、新 Key 创建，旧 Cookie 重放返回 401。
+4. 上线前增加 Redis readiness、连接数、内存和延迟监控。
+5. 再将评论广播迁移为 Redis Pub/Sub，并实现登录/评论限流。
 
-Redis 不需要 Alembic Migration。Alembic 只管理关系型数据库表结构；Redis 的键名、TTL 和数据格式应通过代码约定、测试和文档维护。
+Redis Key 本身不需要 Alembic Migration；键名、TTL 和数据格式通过代码、测试和文档维护。本次切换仍有一条 Alembic 迁移，因为需要删除关系型数据库中已经被替代的旧 `refresh_sessions` 表。
+
+当前 Refresh Key、Lua 原子轮换和数据库表方案对比见
+`docs/Redis会话与数据库表方案对比.md` 与 `docs/JWT与用户认证开发流程.md`。
