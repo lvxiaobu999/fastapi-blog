@@ -2,18 +2,14 @@
 
 ## 1. 本项目的文件结构
 
-本地或单机文件模式只维护两个通道：
+本地或单机文件模式把所有达到 `LOG_LEVEL` 的事件写入同一个日期文件：
 
 ```text
 logs/
-├── app/2026-08-07.log
-└── error/2026-08-07.log
+└── 2026-08-07.log
 ```
 
-- `app`：保存达到 `LOG_LEVEL` 阈值的完整时间线。开发环境为 DEBUG 及以上，生产通常为 INFO 及以上。
-- `error`：额外保存 ERROR 和 CRITICAL 副本，便于快速巡检和定位故障。
-
-ERROR 有意同时出现在两个文件：`app` 用于按 request_id 还原 INFO → WARNING → ERROR 的上下文，`error` 用于只看故障。相比五个等级目录，这种结构不会把一次请求拆散到多个地方。
+DEBUG、INFO、WARNING、ERROR、CRITICAL 仍保留在每条日志的 `level` 字段中，不需要映射为物理目录。这样可以按 request_id 直接阅读 INFO → WARNING → ERROR 的完整时间线；需要只看 ERROR 时使用文本搜索或日志平台字段查询。
 
 ## 2. 配置
 
@@ -29,7 +25,7 @@ LOG_FILES_PER_DAY=5
 LOG_RETENTION_DAYS=14
 ```
 
-单文件最大 20 MiB，达到上限后生成 `.1`～`.4`，因此每个通道每天最多约 100 MiB。进入新的 UTC 日期并首次写入该通道时，会删除 14 天保留窗口以外的文件。
+单文件最大 20 MiB，达到上限后生成 `.1`～`.4`，因此每天最多约 100 MiB。进入新的 UTC 日期并首次写日志时，会删除 14 天保留窗口以外的文件。
 
 修改环境文件后必须重启应用：
 
@@ -47,24 +43,24 @@ Get-ChildItem .\logs -Recurse -File |
     Select-Object FullName, Length, LastWriteTime
 ```
 
-持续查看当天完整日志：
+持续查看当天日志：
 
 ```powershell
 $today = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
-Get-Content ".\logs\app\$today.log" -Wait -Tail 50
+Get-Content ".\logs\$today.log" -Wait -Tail 50
 ```
 
-持续查看当天故障：
+只查看当天 ERROR/CRITICAL：
 
 ```powershell
 $today = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
-Get-Content ".\logs\error\$today.log" -Wait -Tail 50
+Select-String -Path ".\logs\$today.log*" -Pattern " ERROR | CRITICAL "
 ```
 
 跨当前文件和大小轮转文件搜索请求 ID：
 
 ```powershell
-Select-String -Path .\logs\*\*.log* -Pattern "request_id值"
+Select-String -Path .\logs\*.log* -Pattern "request_id值"
 ```
 
 应用按 UTC 日期命名，因此北京时间凌晨可能仍写入前一个 UTC 日期，这是多服务器统一时间边界的预期行为。
@@ -91,17 +87,17 @@ Remove-Item Env:LOG_MAX_BYTES, Env:LOG_FILES_PER_DAY
 
 ## 5. 轮转和删除规则
 
-同一天的 app 文件达到上限后：
+同一天的文件达到上限后：
 
 ```text
-logs/app/2026-08-07.log
-logs/app/2026-08-07.log.1
-logs/app/2026-08-07.log.2
-logs/app/2026-08-07.log.3
-logs/app/2026-08-07.log.4
+logs/2026-08-07.log
+logs/2026-08-07.log.1
+logs/2026-08-07.log.2
+logs/2026-08-07.log.3
+logs/2026-08-07.log.4
 ```
 
-超过 `LOG_FILES_PER_DAY=5` 后删除最旧备份。日期保留清理不是后台定时任务，而是在该通道切换日期后的首次写入时执行。如果需要严格定时清理，应使用日志平台 retention 或受控的运维任务。
+超过 `LOG_FILES_PER_DAY=5` 后删除最旧备份。日期保留清理不是后台定时任务，而是在切换日期后的首次写入时执行。如果需要严格定时清理，应使用日志平台 retention 或受控的运维任务。
 
 手动清理前先停止应用并确认目录：
 
@@ -120,7 +116,7 @@ Get-ChildItem .\logs -Recurse -File -Filter "*.log*" | Clear-Content
 
 ## 6. 常见问题
 
-- 只有 `app` 没有 `error`：当前没有发生 ERROR/CRITICAL，属于正常情况。
+- 找不到独立 error 文件：现在有意只保存一个完整日期文件，使用 level 字段筛选错误。
 - 修改配置没有生效：检查 `Get-ChildItem Env:LOG_*` 是否覆盖 `.env`，然后重启应用。
 - 没有 aiosqlite DEBUG：项目将 `aiosqlite` 和 `sqlalchemy.engine` 单独限制为 WARNING，避免底层数据库日志刷屏。
 - 文件不在预期位置：`LOG_DIRECTORY` 相对于启动进程的工作目录，应从项目根目录启动。

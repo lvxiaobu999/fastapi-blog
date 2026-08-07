@@ -154,13 +154,13 @@ Handler 回答“写到哪里”，Formatter 回答“写成什么样”：
 
 ```text
 LOG_TO_FILE=false -> StreamHandler -> stderr
-LOG_TO_FILE=true  -> DailyChannelFileHandler -> logs/app 与 logs/error
+LOG_TO_FILE=true  -> DailyFileHandler -> logs/YYYY-MM-DD.log
 
 LOG_FORMAT=text   -> 人类易读文本
 LOG_FORMAT=json   -> 日志平台易解析的单行 JSON
 ```
 
-文件模式用 app 保存达到全局阈值的完整链路，用 error 保存 ERROR/CRITICAL 副本；两个通道再按 UTC 日期和单文件大小轮转，最后按保留天数清理历史日期。容器生产环境推荐 stderr/stdout 加外部采集器，因为多 Worker 共同写一个轮转文件可能发生竞争。
+文件模式把所有达到全局阈值的事件写入同一个 UTC 日期文件，保留完整请求顺序；同一天再按单文件大小轮转，最后按保留天数清理历史日期。容器生产环境推荐 stderr/stdout 加外部采集器，因为多 Worker 共同写一个轮转文件可能发生竞争。
 
 ## 9. 一次 HTTP 请求的完整时间顺序
 

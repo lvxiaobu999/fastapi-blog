@@ -10,9 +10,8 @@ import pytest
 from httpx import AsyncClient
 
 from app.core.logging import (
-    DailyChannelFileHandler,
+    DailyFileHandler,
     JsonFormatter,
-    MinimumLevelFilter,
     RequestContextFilter,
     bind_request_id,
     configure_logging,
@@ -86,24 +85,11 @@ def test_noisy_database_loggers_are_limited_to_warning() -> None:
     assert logging.getLogger("sqlalchemy.engine").level == logging.WARNING
 
 
-def test_error_channel_accepts_error_and_critical_only() -> None:
-    """故障副本接收 ERROR/CRITICAL，但不会混入普通 INFO。"""
-
-    error_filter = MinimumLevelFilter(logging.ERROR)
-    info_record = logging.LogRecord("app", logging.INFO, __file__, 1, "info", (), None)
-    error_record = logging.LogRecord("app", logging.ERROR, __file__, 1, "error", (), None)
-    critical_record = logging.LogRecord("app", logging.CRITICAL, __file__, 1, "down", (), None)
-
-    assert error_filter.filter(info_record) is False
-    assert error_filter.filter(error_record) is True
-    assert error_filter.filter(critical_record) is True
-
-
-def test_daily_handler_uses_channel_directory_date_and_size_rotation(tmp_path: Path) -> None:
+def test_daily_handler_uses_date_filename_and_size_rotation(tmp_path: Path) -> None:
     """文件名按 UTC 日期生成，并在单日内容超限时创建大小轮转备份。"""
 
-    handler = DailyChannelFileHandler(
-        tmp_path / "app",
+    handler = DailyFileHandler(
+        tmp_path,
         max_bytes=80,
         files_per_day=2,
         retention_days=14,
@@ -116,12 +102,12 @@ def test_daily_handler_uses_channel_directory_date_and_size_rotation(tmp_path: P
         handler.close()
 
     today = datetime.now(UTC).date().isoformat()
-    assert (tmp_path / "app" / f"{today}.log").exists()
-    assert (tmp_path / "app" / f"{today}.log.1").exists()
+    assert (tmp_path / f"{today}.log").exists()
+    assert (tmp_path / f"{today}.log.1").exists()
 
 
-def test_file_mode_keeps_complete_app_timeline_and_error_copy(tmp_path: Path) -> None:
-    """INFO 只进入 app；ERROR 同时进入 app 完整链路和 error 故障副本。"""
+def test_file_mode_keeps_all_levels_in_one_request_timeline(tmp_path: Path) -> None:
+    """INFO 和 ERROR 应按发生顺序进入同一个日期文件，便于还原请求链。"""
 
     original_settings = get_settings()
     settings = original_settings.model_copy(
@@ -145,12 +131,10 @@ def test_file_mode_keeps_complete_app_timeline_and_error_copy(tmp_path: Path) ->
         configure_logging(original_settings)
 
     today = datetime.now(UTC).date().isoformat()
-    app_text = (tmp_path / "app" / f"{today}.log").read_text(encoding="utf-8")
-    error_text = (tmp_path / "error" / f"{today}.log").read_text(encoding="utf-8")
-    assert "timeline info" in app_text
-    assert "timeline error" in app_text
-    assert "timeline info" not in error_text
-    assert "timeline error" in error_text
+    log_text = (tmp_path / f"{today}.log").read_text(encoding="utf-8")
+    assert "timeline info" in log_text
+    assert "timeline error" in log_text
+    assert log_text.index("timeline info") < log_text.index("timeline error")
 
 
 async def test_http_response_exposes_generated_request_id(client: AsyncClient) -> None:

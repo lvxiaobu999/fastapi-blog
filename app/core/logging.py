@@ -98,21 +98,10 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 
-class MinimumLevelFilter(logging.Filter):
-    """只允许指定等级及以上事件通过，用于生成 ERROR/CRITICAL 故障副本。"""
-
-    def __init__(self, level: int) -> None:
-        super().__init__()
-        self.level = level
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        return record.levelno >= self.level
-
-
-class DailyChannelFileHandler(logging.Handler):
+class DailyFileHandler(logging.Handler):
     """按 UTC 日期写文件，并在单日内按大小继续轮转。
 
-    目录由 configure_logging 按日志用途传入，例如 ``logs/app``。当前文件名始终是
+    configure_logging 传入日志根目录，例如 ``logs``。当前文件名始终是
     ``YYYY-MM-DD.log``；超过 max_bytes 后由 RotatingFileHandler 生成 ``.1``、``.2``。
     日期变化时关闭旧文件并打开新文件，同时清理 retention_days 之前的历史日期。
     """
@@ -188,29 +177,20 @@ class DailyChannelFileHandler(logging.Handler):
         super().close()
 
 
-def _file_handler(settings: Settings, channel: str) -> DailyChannelFileHandler:
-    """创建一个带日期、大小和保留期限制的文件通道。"""
-
-    return DailyChannelFileHandler(
-        Path(settings.log_directory) / channel,
-        max_bytes=settings.log_max_bytes,
-        files_per_day=settings.log_files_per_day,
-        retention_days=settings.log_retention_days,
-    )
-
-
 def _handlers(settings: Settings) -> list[logging.Handler]:
-    """创建终端 Handler，或 app 完整链路与 error 故障副本两个文件 Handler。"""
+    """创建终端 Handler，或一个按日期和大小轮转的完整日志文件 Handler。"""
 
     if settings.log_to_file:
-        # app 不添加等级 Filter：Root Logger 已经依据 LOG_LEVEL 做总过滤，因此这里保留
-        # 所有通过阈值的事件，排错时可按 request_id 看到 INFO -> WARNING -> ERROR 全过程。
-        app_handler = _file_handler(settings, "app")
-        # error 是便于快速巡检的故障副本，只接收 ERROR 和 CRITICAL。保留副本是有意的：
-        # app 用于还原完整上下文，error 用于告警和故障定位，两者用途不同。
-        error_handler = _file_handler(settings, "error")
-        error_handler.addFilter(MinimumLevelFilter(logging.ERROR))
-        return [app_handler, error_handler]
+        # Root Logger 已经依据 LOG_LEVEL 过滤事件。所有通过阈值的等级写入同一日期文件，
+        # 排错时可以按 request_id 直接看到 INFO -> WARNING -> ERROR 的完整时间顺序。
+        return [
+            DailyFileHandler(
+                Path(settings.log_directory),
+                max_bytes=settings.log_max_bytes,
+                files_per_day=settings.log_files_per_day,
+                retention_days=settings.log_retention_days,
+            )
+        ]
     # 未指定 stream 时默认写 sys.stderr。容器会采集 stdout/stderr，因此生产环境无需让
     # FastAPI 自己调用 Loki/ELK HTTP API，也不会把第三方平台延迟加到业务请求中。
     return [logging.StreamHandler()]
