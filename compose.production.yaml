@@ -1,0 +1,70 @@
+# 生产 Compose 只运行 FastAPI 和 Nginx。PostgreSQL 使用 RDS，Redis 使用 Tair，
+# 两者的 VPC 内网连接信息通过 APP_ENV_FILE 注入，不能写进本文件或镜像。
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # 发布时用 Git commit/tag 设置 APP_IMAGE_TAG，避免无法判断线上实际运行版本。
+    image: fastapi-blog:${APP_IMAGE_TAG:-local}
+    env_file:
+      - ${APP_ENV_FILE:-/opt/fastapi-blog/config/app.env}
+    expose:
+      - "8000"
+    volumes:
+      # 用户头像和文章图片写入 app/media；容器重建后仍由 ECS 数据盘保存。
+      - ${MEDIA_HOST_PATH:-/opt/fastapi-blog/data/media}:/app/app/media
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      # 使用 Python 标准库检查应用入口，避免为健康检查额外安装 curl/wget。
+      test:
+        [
+          "CMD",
+          "uv",
+          "run",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:1.28-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      # 官方 Nginx 镜像启动时会把该值替换进 /etc/nginx/templates 下的模板。
+      APP_DOMAIN: ${APP_DOMAIN:?请设置生产域名，例如 blog.example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # 目录内必须提供 fullchain.pem 和 privkey.pem；私钥不得提交 Git。
+      - ${TLS_HOST_PATH:-/opt/fastapi-blog/secrets/tls}:/etc/nginx/tls:ro
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - backend
+
+networks:
+  # 8000 只在内部网络暴露；公网只能通过 Nginx 的 80/443 进入。
+  backend:
+    driver: bridge
+

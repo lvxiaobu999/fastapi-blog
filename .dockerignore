@@ -1,0 +1,33 @@
+# 构建上下文不携带版本历史、虚拟环境和 Python 缓存。
+.git
+.venv
+__pycache__/
+*.py[cod]
+
+# 环境文件可能包含数据库、Redis 和 JWT Secret，禁止进入任何镜像层。
+.env
+.env.*
+!.env.example
+
+# 本地数据、上传文件和日志通过运行时挂载或外部服务提供。
+*.db
+*.sqlite
+*.sqlite3
+app/media/*
+logs/
+data/
+secrets/
+
+# 测试和学习文档不属于生产运行时；CI 应在构建镜像前完成验证。
+tests/
+docs/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 本地工具与编辑器文件。
+.idea/
+.vscode/
+*.log
+
