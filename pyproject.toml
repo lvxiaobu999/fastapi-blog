@@ -46,6 +46,8 @@ pythonpath = ["."]
 dev = [
     "fakeredis[lua]>=2.37.0",
     "pytest>=9.1.1",
+    # 项目文档和交付流程使用 Ruff 做静态检查；纳入锁文件后全新环境也能复现。
+    "ruff>=0.15.21",
 ]
 
 [tool.fastapi]

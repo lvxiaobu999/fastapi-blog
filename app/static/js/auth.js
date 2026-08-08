@@ -54,6 +54,15 @@ $(function () {
             .forEach((element) => { element.textContent = `@${user.username}`; });
         document.querySelectorAll("[data-profile-link]")
             .forEach((link) => { link.href = `/profile/${user.id}`; });
+        const profileOwner = document.querySelector("[data-profile-owner-id]");
+        if (profileOwner?.dataset.profileOwnerId === String(user.id)) {
+            // 资料页的 HTML 是公开响应，服务端不能读取 localStorage 中的 Access Token，
+            // 因此邮箱绝不能预渲染。只有 /auth/me 验证本人后才填值并解锁编辑控件。
+            const emailInput = document.querySelector("[data-profile-form] [name=email]");
+            if (emailInput) emailInput.value = user.email;
+            document.querySelector("[data-profile-settings]")?.removeAttribute("hidden");
+            document.querySelector("[data-avatar-editor]")?.removeAttribute("hidden");
+        }
         if (!adminContent) return;
         adminContent.hidden = !user.is_admin;
         if (adminDenied) adminDenied.hidden = user.is_admin;

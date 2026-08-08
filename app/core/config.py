@@ -81,6 +81,10 @@ class Settings(BaseSettings):
             raise ValueError("Development DATABASE_URL must use SQLite with aiosqlite")
         if self.env == "production" and not self.database_url.startswith("postgresql+psycopg://"):
             raise ValueError("Production DATABASE_URL must use PostgreSQL with psycopg")
+        # Refresh Token 保存在 Cookie 中。生产流量即使通常由 Nginx 跳转到 HTTPS，漏掉
+        # Secure 仍可能让浏览器在跳转前的 HTTP 请求中携带 Cookie，因此必须启动失败。
+        if self.env == "production" and not self.auth_cookie_secure:
+            raise ValueError("Production AUTH_COOKIE_SECURE must be true")
         if self.refresh_idle_timeout_minutes <= self.access_token_expire_minutes:
             raise ValueError("REFRESH_IDLE_TIMEOUT_MINUTES must exceed ACCESS_TOKEN_EXPIRE_MINUTES")
         redis_url = self.redis_url.get_secret_value()

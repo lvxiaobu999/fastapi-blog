@@ -53,7 +53,9 @@ async def test_page_router_renders_pages(
 
     assert all(response.status_code == 200 for response in responses)
     assert "FastAPI page" in responses[1].text
-    assert "author@example.com" in responses[7].text
+    # 资料页是公开 GET，邮箱只能在 /api/auth/me 验证本人后由前端填充。
+    assert "author@example.com" not in responses[7].text
+    assert "data-profile-settings hidden" in responses[7].text
     assert "data-avatar-editor" in responses[7].text
     assert "data-avatar-input" in responses[7].text
     assert "data-profile-avatar-image" in responses[7].text

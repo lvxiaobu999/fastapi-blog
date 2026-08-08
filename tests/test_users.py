@@ -51,6 +51,8 @@ async def test_create_read_and_list_user(
     listing = await client.get("/api/users", params={"offset": 0, "limit": 10})
     assert detail.status_code == 200
     assert detail.json()["data"]["id"] == body["id"]
+    assert "email" not in detail.json()["data"]
+    assert "email" not in listing.json()["data"][0]
     assert [user["id"] for user in listing.json()["data"]] == [body["id"]]
 
     async with session_factory() as session:

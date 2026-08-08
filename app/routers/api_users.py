@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.dependencies.auth import CurrentUser
 from app.schemas import UserCreate, UserResponse, UserUpdate
 from app.schemas.api import ApiSuccess
+from app.schemas.user import UserPublic
 from app.services import users as user_service
 from app.services.images import InvalidImageError, save_profile_image
 
@@ -48,26 +49,27 @@ async def create_user(
         ) from exc
 
 
-@router.get("", response_model=ApiSuccess[list[UserResponse]])
+@router.get("", response_model=ApiSuccess[list[UserPublic]])
 async def list_users(
     request: Request,
     session: DbSession,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
-) -> ApiSuccess[list[UserResponse]]:
-    """分页获取用户列表，单次最多返回 100 条。"""
+) -> ApiSuccess[list[UserPublic]]:
+    """分页获取公开用户资料，单次最多返回 100 条且不包含邮箱。"""
 
     users = await user_service.list_users(session, offset=offset, limit=limit)
-    data = [UserResponse.model_validate(user) for user in users]
+    # 列表接口无需认证，必须使用不含邮箱的公开契约，避免被批量收集联系方式。
+    data = [UserPublic.model_validate(user) for user in users]
     return success_response(request, data)
 
 
-@router.get("/{user_id}", response_model=ApiSuccess[UserResponse])
-async def get_user(request: Request, user_id: int, session: DbSession) -> ApiSuccess[UserResponse]:
+@router.get("/{user_id}", response_model=ApiSuccess[UserPublic])
+async def get_user(request: Request, user_id: int, session: DbSession) -> ApiSuccess[UserPublic]:
     """获取单个用户的公开信息。"""
 
     user = await _get_user_or_404(session, user_id)
-    return success_response(request, UserResponse.model_validate(user))
+    return success_response(request, UserPublic.model_validate(user))
 
 
 @router.patch("/{user_id}", response_model=ApiSuccess[UserResponse])

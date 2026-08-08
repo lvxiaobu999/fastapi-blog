@@ -2,8 +2,9 @@
 {% block content %}
 <div class="row g-4">
     <aside class="col-lg-4">
-        <section class="profile-summary" aria-labelledby="profile-name">
-            <label class="profile-avatar-editor" data-avatar-editor>
+        <section class="profile-summary" aria-labelledby="profile-name"
+                 data-profile-owner-id="{{ user.id }}">
+            <label class="profile-avatar-editor" data-avatar-editor hidden>
                 <img src="{{ user.image_path }}" alt="{{ user.nickname }}的头像"
                      data-profile-avatar-image>
                 <span class="profile-avatar-overlay">
@@ -21,12 +22,11 @@
             <span class="role-badge">{{ "管理员" if user.is_admin else "普通用户" }}</span>
             <h1 id="profile-name">{{ user.nickname }}</h1>
             <p>@{{ user.username }}</p>
-            <p class="profile-email">{{ user.email }}</p>
         </section>
     </aside>
 
     <section class="col-lg-8" aria-labelledby="settings-title">
-        <div class="settings-panel">
+        <div class="settings-panel" data-profile-settings hidden>
             <div class="section-heading">
                 <div>
                     <span class="eyebrow">Account settings</span>
@@ -56,7 +56,7 @@
                     <div class="col-12">
                         <label class="form-label" for="email">邮箱</label>
                         <input class="form-control" id="email" name="email" type="email"
-                               maxlength="254" required value="{{ user.email }}">
+                               maxlength="254" required value="">
                     </div>
                 </div>
                 <div class="form-actions">
