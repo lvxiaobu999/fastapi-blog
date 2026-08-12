@@ -1,9 +1,11 @@
-"""帖子图片校验和本地存储服务。
+"""帖子与头像图片的校验、本地存储和受控删除服务。
 
 本模块只负责限制文件大小、识别允许的图片签名并生成随机文件名；不处理 HTTP 身份
 认证，也不负责数据库记录。图片通过应用已有的 ``/media`` 静态挂载公开读取。
 """
 
+import logging
+from pathlib import Path
 from uuid import uuid4
 
 from anyio import to_thread
@@ -20,6 +22,7 @@ from app.templating import APP_DIR
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 POST_IMAGE_DIR = APP_DIR / "media" / "post_images"
 PROFILE_IMAGE_DIR = APP_DIR / "media" / "profile_pics"
+logger = logging.getLogger(__name__)
 
 
 class InvalidImageError(ValueError):
@@ -99,3 +102,32 @@ async def save_profile_image(upload: UploadFile) -> str:
 
     await to_thread.run_sync(write_image)
     return filename
+
+
+async def delete_profile_image(filename: str | None) -> bool:
+    """删除由本站生成的头像文件；非法路径和不存在文件按幂等成功处理。
+
+    数据库只应保存随机文件名，但删除仍验证 ``Path.name``，避免历史脏数据把清理范围带出
+    ``profile_pics``。删除失败只记录诊断信息并返回 False：数据库提交后不能因为旧文件
+    清理失败把一次已成功的头像更新伪装成失败响应，残留文件可再由运维任务清理。
+    """
+
+    if not filename or Path(filename).name != filename:
+        return True
+    target = PROFILE_IMAGE_DIR / filename
+
+    def unlink_image() -> bool:
+        """在线程中执行同步 unlink，并让重复清理保持幂等。"""
+
+        try:
+            target.unlink(missing_ok=True)
+        except OSError:
+            logger.warning(
+                "Could not delete profile image",
+                extra={"image_filename": filename},
+                exc_info=True,
+            )
+            return False
+        return True
+
+    return await to_thread.run_sync(unlink_image)

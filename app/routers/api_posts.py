@@ -19,8 +19,8 @@ from app.schemas.post import (
     PostUpdate,
 )
 from app.schemas.upload import ImageUploadResponse
-from app.services.images import InvalidImageError, save_post_image
 from app.services import posts as post_service
+from app.services.images import InvalidImageError, save_post_image
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -114,6 +114,19 @@ async def list_admin_posts(
 
     posts = await post_service.list_posts(session, params, include_unpublished=True)
     return success_response(request, [PostResponse.model_validate(post) for post in posts])
+
+
+@router.get("/admin/{post_id}", response_model=ApiSuccess[PostResponse])
+async def get_admin_post(
+    request: Request,
+    post_id: int,
+    session: DbSession,
+    _current_user: AdminUser,
+) -> ApiSuccess[PostResponse]:
+    """为编辑页返回单篇文章，包括尚未上架的草稿。"""
+
+    post = await _get_post_or_404(session, post_id)
+    return success_response(request, PostResponse.model_validate(post))
 
 
 @router.get("/search", response_model=ApiSuccess[list[PostTitleSearchResult]])

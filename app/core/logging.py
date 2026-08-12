@@ -38,6 +38,8 @@ def bind_request_id(request_id: UUID | str) -> Token[str]:
     ``ContextVar.set()`` 不只是赋值，还会返回一个记录“赋值前状态”的 Token。HTTP
     中间件在调用 Router 前执行本函数，因此 Router、Service 以及它们 await 的下层协程
     都能读取这个 ID，而业务函数不需要把 request_id 作为参数逐层传递。
+
+    返回值不是“上一个 request_id”字符串，而是只能交给 ``reset()`` 使用的上下文恢复凭据。
     """
 
     return _request_id.set(str(request_id))
@@ -165,7 +167,9 @@ class DailyFileHandler(logging.Handler):
             # Formatter 配置在外层 Handler 上；日期切换创建新 delegate 后同步过去。
             delegate.setFormatter(self.formatter)
             delegate.emit(record)
-        except Exception:
+        # logging.Handler.emit 的契约要求日志后端故障不能中断业务请求；Formatter 和底层
+        # 文件写入可能抛出不同异常，因此在这个边界统一交给 handleError 处理。
+        except Exception:  # noqa: BLE001
             self.handleError(record)
 
     def close(self) -> None:

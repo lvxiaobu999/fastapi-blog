@@ -11,13 +11,14 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api_responses import API_ERROR_RESPONSES, success_response
-from app.db.session import get_db
 from app.db.redis import get_redis
+from app.db.session import get_db
 from app.dependencies.auth import AdminUser
 from app.schemas.api import ApiSuccess
 from app.schemas.user import AdminUserCreate, AdminUserUpdate, UserResponse
-from app.services import users as user_service
 from app.services import refresh_sessions as refresh_session_service
+from app.services import users as user_service
+from app.services.images import delete_profile_image
 
 # ==================== Router 入口导读 ====================
 # admin.js 在后台用户管理页加载、创建、编辑或删除用户时进入本 Router。
@@ -102,6 +103,9 @@ async def delete_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete your own account from admin",
         )
-    await user_service.delete_user(session, user)
+    # Redis 撤销失败时保留数据库用户，比“用户已删除但会话清理失败”更容易安全重试。
+    avatar_filename = user.image_file
     await refresh_session_service.revoke_user_refresh_sessions(redis, user_id)
+    await user_service.delete_user(session, user)
+    await delete_profile_image(avatar_filename)
     return success_response(request, None)

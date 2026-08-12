@@ -116,18 +116,19 @@ async def new_post_page(request: Request, session: DbSession):
 
 @router.get("/posts/{post_id}/edit", name="post_edit")
 async def edit_post_page(request: Request, post_id: int, session: DbSession):
-    """查询并渲染指定帖子的编辑表单。"""
+    """渲染编辑表单外壳，文章数据由受保护的管理员 API 加载。
 
-    post = await post_service.get_post(session, post_id)
-    if post is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    HTML 页面请求不会携带保存在 ``localStorage`` 中的 Bearer Token，因此这里不能在
+    服务端确认管理员身份。若直接查询并预渲染文章，匿名用户只要猜到 ID 就能读取草稿。
+    页面只接收 ``post_id``，随后由 ``posts.js`` 调用管理员 API 完成鉴权和数据加载。
+    """
 
     categories = await category_service.list_categories(session)
 
     return templates.TemplateResponse(
         request,
         "post_form.html",
-        {"post": post, "categories": categories, "title": "Edit post"},
+        {"post_id": post_id, "categories": categories, "title": "Edit post"},
     )
 
 

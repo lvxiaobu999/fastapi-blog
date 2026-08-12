@@ -1,8 +1,9 @@
 """用户数据访问与业务规则。"""
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models import User
 from app.schemas import UserCreate, UserUpdate
 from app.schemas.user import AdminUserCreate, AdminUserUpdate
@@ -192,7 +193,9 @@ async def create_admin_managed_user(session: AsyncSession, data: AdminUserCreate
     由 api_admin Router 保证。
     """
 
-    user = await create_user(session, UserCreate.model_validate(data.model_dump()), is_admin=data.is_admin)
+    user = await create_user(
+        session, UserCreate.model_validate(data.model_dump()), is_admin=data.is_admin
+    )
     if data.nickname:
         user.nickname = data.nickname.strip()
         await session.commit()
@@ -224,27 +227,32 @@ async def set_profile_image(session: AsyncSession, user: User, filename: str) ->
     """让用户在资料弹窗点击头像后立即把新头像绑定到自己的账号。
 
     图片 Service 已负责校验并保存文件，这里只更新 ``users.image_file``。把两项职责分开，
-    是因为文件写磁盘与用户表更新属于不同操作；成功后 refresh，让 Router 立即返回新头像。
+    是因为文件写磁盘与用户表更新属于不同操作。当前 Session 使用
+    ``expire_on_commit=False``，且头像字段没有数据库生成值，提交后无需额外 ``refresh()``；
+    这样 Router 捕获到的数据库异常一定发生在提交前，可以安全补偿删除新文件。
     """
 
     user.image_file = filename
-    await session.commit()
-    await session.refresh(user)
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        # 保持 Session 可继续被请求清理流程使用；具体数据库异常仍交给全局处理器记录。
+        await session.rollback()
+        raise
     return user
 
 
-async def change_password(
+async def stage_password_change(
     session: AsyncSession, user: User, current_password: str, new_password: str
 ) -> bool:
-    """实现头像菜单“修改密码”弹窗的安全保存流程。
+    """验证旧密码并暂存新密码哈希，但不提交数据库事务。
 
     即使用户当前已登录，也必须再次验证旧密码，避免他人拿到未锁定浏览器后直接接管账号。
-    旧密码错误返回 False 且不写库，Router 据此给出业务提示；正确时只保存新密码的哈希并
-    提交。确认新密码是否一致由请求 Schema 负责，避免业务层接收两个含义重复的值。
+    旧密码错误返回 False 且不写库；正确时只修改当前 Session 中的 ORM 对象。Router 先
+    撤销 Redis Refresh Session，再提交数据库，使 Redis 故障时密码仍保持原值。
     """
 
     if not await verify_password(current_password, user.hashed_password):
         return False
     user.hashed_password = await hash_password(new_password)
-    await session.commit()
     return True

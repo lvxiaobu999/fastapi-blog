@@ -5,12 +5,10 @@ FastAPI 正确生成 OpenAPI 文档。异常响应由 ``app.exception_handlers``
 """
 
 from datetime import datetime
-from typing import Generic, Literal, TypeVar
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_serializer
-
-DataT = TypeVar("DataT")
 
 
 class ResponseMeta(BaseModel):
@@ -30,7 +28,7 @@ class ResponseMeta(BaseModel):
         return value.isoformat()
 
 
-class ApiSuccess(BaseModel, Generic[DataT]):
+class ApiSuccess[DataT](BaseModel):
     """统一成功响应；泛型参数描述 ``data`` 中实际业务数据的类型。"""
 
     success: Literal[True] = True

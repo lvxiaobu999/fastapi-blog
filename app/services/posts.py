@@ -83,9 +83,7 @@ async def update_post(session: AsyncSession, post: Post, data: PostUpdate) -> Po
         return post
 
     if "category_id" in changes:
-        category = await category_service.get_category_by_id(
-            session, changes.pop("category_id")
-        )
+        category = await category_service.get_category_by_id(session, changes.pop("category_id"))
         if category is None:
             raise PostCategoryNotFoundError
         post.category = category
@@ -143,9 +141,7 @@ async def list_posts(
     仍共享一致筛选规则。它只读取数据库，不记录浏览；浏览必须在真正进入详情页时发生。
     """
 
-    statement = select(Post).options(
-        selectinload(Post.author), selectinload(Post.category)
-    )
+    statement = select(Post).options(selectinload(Post.author), selectinload(Post.category))
     if not include_unpublished:
         # 公开搜索、分类和首页只展示上架文章；后台通过显式可信参数读取全部。
         statement = statement.where(Post.is_published.is_(True))
@@ -176,9 +172,7 @@ async def list_posts(
     return list(result)
 
 
-async def search_post_titles(
-    session: AsyncSession, params: PostTitleSearchParams
-) -> list[Post]:
+async def search_post_titles(session: AsyncSession, params: PostTitleSearchParams) -> list[Post]:
     """为顶部导航搜索模态框提供输入过程中的标题联想候选。
 
     用户每次停止输入（前端防抖后）会调用此查询，点击候选直接进入详情页。因此只需要文章

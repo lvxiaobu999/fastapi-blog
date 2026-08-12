@@ -74,9 +74,7 @@ async def test_list_posts_filters_category(
     response = await client.get("/api/posts", params={"category": "python"})
 
     assert response.status_code == 200
-    assert [post["id"] for post in response.json()["data"]] == list(
-        reversed(seeded_posts[1:])
-    )
+    assert [post["id"] for post in response.json()["data"]] == list(reversed(seeded_posts[1:]))
 
 
 async def test_search_endpoint_returns_title_only(
@@ -87,9 +85,7 @@ async def test_search_endpoint_returns_title_only(
     content_only = await client.get("/api/posts/search", params={"keyword": "database"})
 
     assert response.status_code == 200
-    assert response.json()["data"] == [
-        {"id": seeded_posts[0], "title": "Learning FastAPI"}
-    ]
+    assert response.json()["data"] == [{"id": seeded_posts[0], "title": "Learning FastAPI"}]
     assert content_only.json()["data"] == []
 
 

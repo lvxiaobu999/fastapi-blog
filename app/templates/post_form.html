@@ -1,19 +1,20 @@
 {% extends "admin/layout.html" %}
 {% block page_id %}posts{% endblock %}
 {% block head %}
-<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
-<link rel="stylesheet" href="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight.min.css">
+<link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-3.2.2.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.1.0.css') }}">
 {% endblock head %}
 {% block content %}
+{% set editing_post_id = post_id | default(none) %}
 <div class="editor-shell admin-editor-shell">
     <section class="editor-panel" aria-labelledby="editor-title">
         <div class="section-heading editor-heading">
             <div>
-                <span class="eyebrow">{{ "Edit story" if post | default(none) else "New story" }}</span>
-                <h1 id="editor-title">{{ "编辑文章" if post | default(none) else "发布新文章" }}</h1>
-                <p>{{ "修改完成后保存文章内容。" if post | default(none) else "写下值得分享的内容，发布后读者即可看到。" }}</p>
+                <span class="eyebrow">{{ "Edit story" if editing_post_id else "New story" }}</span>
+                <h1 id="editor-title">{{ "编辑文章" if editing_post_id else "发布新文章" }}</h1>
+                <p>{{ "修改完成后保存文章内容。" if editing_post_id else "写下值得分享的内容，发布后读者即可看到。" }}</p>
             </div>
-            {% if post | default(none) %}<span class="status-pill">文章 #{{ post.id }}</span>{% endif %}
+            {% if editing_post_id %}<span class="status-pill">文章 #{{ editing_post_id }}</span>{% endif %}
         </div>
 
         {% if errors | default(none) %}
@@ -25,22 +26,21 @@
         {% endif %}
 
         <form class="stacked-form" data-post-form
-              {% if post | default(none) %}data-post-id="{{ post.id }}"{% endif %}>
+              {% if editing_post_id %}data-post-id="{{ editing_post_id }}"{% endif %}>
             <div class="alert alert-danger d-none" role="alert" data-form-feedback></div>
             <div>
                 <label class="form-label" for="title">标题</label>
                 <input class="form-control form-control-lg" id="title" name="title" type="text"
                        minlength="1" maxlength="100" required autofocus
-                       value="{{ post.title | default('') if post | default(none) else '' }}">
+                       value="">
                 <div class="form-text">1～100 个字符。</div>
             </div>
             <div>
                 <label class="form-label" for="category_id">分类</label>
                 <select class="form-select" id="category_id" name="category_id" required>
-                    <option value="" disabled{% if not post | default(none) %} selected{% endif %}>请选择文章分类</option>
+                    <option value="" disabled selected>请选择文章分类</option>
                     {% for category in categories %}
-                    <option value="{{ category.id }}"
-                            {% if post | default(none) and post.category_id == category.id %}selected{% endif %}>
+                    <option value="{{ category.id }}">
                         {{ category.name }}
                     </option>
                     {% endfor %}
@@ -50,36 +50,34 @@
             <div>
                 <label class="form-label" for="summary">摘要</label>
                 <textarea class="form-control" id="summary" name="summary" rows="3" maxlength="300"
-                          placeholder="简要介绍文章内容，最多 300 字">{{ post.summary | default('', true) if post | default(none) else '' }}</textarea>
+                          placeholder="简要介绍文章内容，最多 300 字"></textarea>
                 <div class="form-text">用于文章列表快速了解内容；留空时列表会截取正文。</div>
             </div>
             <div class="post-cover-field">
                 <div class="form-label-row">
                     <label class="form-label" for="cover-image">文章横图</label>
-                    <button class="btn btn-sm btn-outline-secondary{% if not post | default(none) or not post.cover_image_url %} d-none{% endif %}"
+                    <button class="btn btn-sm btn-outline-secondary d-none"
                             type="button" data-cover-remove>移除横图</button>
                 </div>
                 <input id="cover_image_url" name="cover_image_url" type="hidden"
-                       value="{{ post.cover_image_url | default('', true) if post | default(none) else '' }}">
+                       value="">
                 <label class="post-cover-uploader" for="cover-image" data-cover-uploader>
-                    <img src="{{ post.cover_image_url | default('', true) if post | default(none) else '' }}"
-                         alt="文章横图预览" data-cover-preview
-                         {% if not post | default(none) or not post.cover_image_url %}hidden{% endif %}>
-                    <span data-cover-placeholder{% if post | default(none) and post.cover_image_url %} hidden{% endif %}>选择一张横向图片</span>
+                    <img src="" alt="文章横图预览" data-cover-preview hidden>
+                    <span data-cover-placeholder>选择一张横向图片</span>
                     <input id="cover-image" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
                 </label>
                 <div class="form-text" data-cover-feedback>建议使用 16:9 横图，文件不超过 5 MB。</div>
             </div>
             <div class="form-check form-switch post-publish-switch">
                 <input class="form-check-input" id="is_published" name="is_published" type="checkbox"
-                       {% if not post | default(none) or post.is_published %}checked{% endif %}>
+                       {% if not editing_post_id %}checked{% endif %}>
                 <label class="form-check-label" for="is_published">立即上架</label>
                 <div class="form-text">关闭后文章保留在后台，但不会出现在公开列表、搜索和详情页。</div>
             </div>
             <div>
                 <label class="form-label" for="content">正文</label>
                 <div id="post-editor" class="post-editor"></div>
-                <textarea class="d-none" id="content" name="content">{{ post.content | default('') if post | default(none) else '' }}</textarea>
+                <textarea class="d-none" id="content" name="content"></textarea>
             </div>
             <div class="form-actions editor-actions">
                 <a class="btn btn-outline-secondary" href="{{ url_for('admin_posts') }}">取消</a>
@@ -93,7 +91,7 @@
                         <span>预览文章</span>
                     </button>
                     <button class="btn btn-primary px-4" type="submit">
-                        {{ "保存修改" if post | default(none) else "发布文章" }}
+                        {{ "保存修改" if editing_post_id else "发布文章" }}
                     </button>
                 </div>
             </div>
@@ -128,7 +126,7 @@
 </div>
 {% endblock content %}
 {% block scripts %}
-<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
-<script src="https://uicdn.toast.com/editor-plugin-code-syntax-highlight/latest/toastui-editor-plugin-code-syntax-highlight-all.min.js"></script>
+<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-3.2.2.js') }}"></script>
+<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.1.0.js') }}"></script>
 <script type="module" src="{{ url_for('static', path='js/posts.js') }}"></script>
 {% endblock scripts %}

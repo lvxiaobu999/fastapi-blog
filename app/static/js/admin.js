@@ -106,7 +106,7 @@ $(function () {
         }
     }
 
-    ajaxRequest({url: "/api/auth/me", auth: true, refreshAuth: false}).done((user) => {
+    ajaxRequest({url: "/api/auth/me", auth: true}).done((user) => {
         if (!user.is_admin) {
             // HTML GET 无法读取 localStorage Token，所以先通过 API 确认身份。普通用户身份
             // 有效但权限不足，跳到真正返回 HTTP 403 的页面；replace 防止返回键反复进入。

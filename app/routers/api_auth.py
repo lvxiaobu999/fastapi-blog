@@ -9,13 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api_responses import API_ERROR_RESPONSES, success_response
 from app.core import get_settings
-from app.db.session import get_db
 from app.db.redis import get_redis
-from app.schemas.auth import PasswordChangeRequest, TokenResponse
-from app.schemas.api import ApiSuccess
-from app.schemas.user import UserResponse
+from app.db.session import get_db
 from app.dependencies.auth import CurrentUser
 from app.models import User
+from app.schemas.api import ApiSuccess
+from app.schemas.auth import PasswordChangeRequest, TokenResponse
+from app.schemas.user import UserResponse
 from app.services import auth as auth_service
 from app.services import refresh_sessions as refresh_session_service
 from app.services import users as user_service
@@ -162,7 +162,7 @@ async def change_password(
 ) -> ApiSuccess[None]:
     """验证当前密码后修改密码；旧密码错误返回 400。"""
 
-    if not await user_service.change_password(
+    if not await user_service.stage_password_change(
         session, current_user, data.current_password, data.new_password
     ):
         raise HTTPException(
@@ -170,6 +170,9 @@ async def change_password(
         )
     # 密码变化属于高风险账户事件，撤销该用户所有设备的 Refresh Session。现有无状态
     # Access JWT 最长仍可使用到自身 exp，因此生产应保持较短 Access Token 有效期。
+    # 先撤销会话再提交密码。Redis 失败时依赖的异常处理器返回 503，而请求级 Session
+    # 关闭时会丢弃尚未提交的新哈希，避免响应失败但密码已经改变的跨存储部分提交。
     await refresh_session_service.revoke_user_refresh_sessions(redis, current_user.id)
+    await session.commit()
     response.delete_cookie("refresh_token", path="/api")
     return success_response(request, None)

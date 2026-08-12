@@ -160,7 +160,7 @@ $(function () {
     // head 中已经根据缓存 Token 同步设置首屏状态；这里再向后端验证真实性。
     // ajaxRequest 会在 Access Token 过期时尝试 Refresh，最终失败则清理状态并弹登录框。
     if (getToken()) {
-        ajaxRequest({url: "/api/auth/me", auth: true, refreshAuth: false})
+        ajaxRequest({url: "/api/auth/me", auth: true})
             .done(applyCurrentUser);
     } else {
         setAuthState(false);

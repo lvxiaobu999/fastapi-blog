@@ -29,7 +29,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_refresh_sessions_token_hash", "refresh_sessions", ["token_hash"], unique=True)
+    op.create_index(
+        "ix_refresh_sessions_token_hash", "refresh_sessions", ["token_hash"], unique=True
+    )
     op.create_index("ix_refresh_sessions_user_id", "refresh_sessions", ["user_id"], unique=False)
 
 

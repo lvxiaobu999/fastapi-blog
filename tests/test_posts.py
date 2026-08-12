@@ -87,9 +87,7 @@ async def test_create_post_rejects_missing_author(session: AsyncSession) -> None
         )
 
 
-async def test_create_post_rejects_missing_category(
-    session: AsyncSession, author: User
-) -> None:
+async def test_create_post_rejects_missing_category(session: AsyncSession, author: User) -> None:
     with pytest.raises(PostCategoryNotFoundError):
         await create_post(
             session,
@@ -164,9 +162,7 @@ async def test_list_posts_searches_title_and_content(
     assert [post.id for post in content_results] == [database_post.id]
 
 
-async def test_public_queries_hide_unpublished_posts(
-    session: AsyncSession, author: User
-) -> None:
+async def test_public_queries_hide_unpublished_posts(session: AsyncSession, author: User) -> None:
     """下架文章仅能由后台查询，不能出现在公开列表、详情或标题联想中。"""
 
     hidden = await create_post(
@@ -181,9 +177,7 @@ async def test_public_queries_hide_unpublished_posts(
 
     assert await get_post(session, hidden.id, include_unpublished=False) is None
     assert await list_posts(session, PostQueryParams(keyword="Hidden")) == []
-    assert await search_post_titles(
-        session, PostTitleSearchParams(keyword="Hidden")
-    ) == []
+    assert await search_post_titles(session, PostTitleSearchParams(keyword="Hidden")) == []
     admin_results = await list_posts(
         session, PostQueryParams(keyword="Hidden"), include_unpublished=True
     )
@@ -233,9 +227,7 @@ async def test_list_posts_filters_category_slug(
     assert [post.id for post in results] == [fastapi_post.id]
 
 
-async def test_title_search_does_not_match_content(
-    session: AsyncSession, author: User
-) -> None:
+async def test_title_search_does_not_match_content(session: AsyncSession, author: User) -> None:
     title_match = await create_post(
         session,
         PostCreate(title="FastAPI search", content="Body", user_id=author.id),
@@ -245,9 +237,7 @@ async def test_title_search_does_not_match_content(
         PostCreate(title="Another title", content="FastAPI in body", user_id=author.id),
     )
 
-    results = await search_post_titles(
-        session, PostTitleSearchParams(keyword="fastapi")
-    )
+    results = await search_post_titles(session, PostTitleSearchParams(keyword="fastapi"))
 
     assert [post.id for post in results] == [title_match.id]
 

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models import User
 from app.services.auth import (
+    authenticate_user,
     create_access_token,
     hash_password,
     verify_access_token,
@@ -30,11 +31,12 @@ async def test_refresh_session_service_accepts_binary_redis_responses() -> None:
     try:
         current_token = await create_refresh_session(redis, user_id=1)
         await revoke_refresh_session(redis, current_token)
-        assert not [key async for key in redis.scan_iter("*:auth:*")]
+        assert not [key async for key in redis.scan_iter("*:session:*")]
 
         await create_refresh_session(redis, user_id=1)
         await revoke_user_refresh_sessions(redis, user_id=1)
-        assert not [key async for key in redis.scan_iter("*:auth:*")]
+        assert not [key async for key in redis.scan_iter("*:sessions")]
+        assert [key async for key in redis.scan_iter("*:generation")]
     finally:
         await redis.aclose()
 
@@ -66,6 +68,27 @@ async def test_explicit_password_and_token_helpers() -> None:
 
     token = create_access_token(42)
     assert verify_access_token(token) == 42
+
+
+async def test_missing_user_still_runs_password_verification(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """账号不存在时也执行一次 Argon2 校验，缩小登录账号枚举的时序差异。"""
+
+    calls: list[tuple[str, str]] = []
+
+    async def fake_verify_password(password: str, password_hash: str) -> bool:
+        calls.append((password, password_hash))
+        return False
+
+    monkeypatch.setattr("app.services.auth.verify_password", fake_verify_password)
+    async with session_factory() as session:
+        result = await authenticate_user(session, "missing", "submitted-password")
+
+    assert result is None
+    assert len(calls) == 1
+    assert calls[0][0] == "submitted-password"
+    assert calls[0][1].startswith("$argon2id$")
 
 
 async def test_login_returns_bearer_token_and_rejects_bad_credentials(client: AsyncClient) -> None:
@@ -150,6 +173,48 @@ async def test_rotated_refresh_token_cannot_be_replayed(client: AsyncClient) -> 
     assert replay.status_code == 401
 
 
+async def test_logout_with_pre_rotation_token_revokes_current_session(
+    client: AsyncClient,
+) -> None:
+    """轮换前的 Cookie 仍定位同一稳定会话，退出必须同时撤销轮换后的 Token。"""
+
+    await register(client)
+    old_token = (await login(client)).cookies.get("refresh_token")
+    assert old_token
+    refreshed = await client.post(
+        "/api/auth/refresh", headers={"Cookie": f"refresh_token={old_token}"}
+    )
+    current_token = refreshed.cookies.get("refresh_token")
+    assert refreshed.status_code == 200
+    assert current_token
+
+    logout = await client.post("/api/auth/logout", headers={"Cookie": f"refresh_token={old_token}"})
+    replay = await client.post(
+        "/api/auth/refresh", headers={"Cookie": f"refresh_token={current_token}"}
+    )
+
+    assert logout.status_code == 200
+    assert replay.status_code == 401
+
+
+async def test_user_generation_revokes_all_existing_refresh_tokens(
+    fake_redis: FakeRedis,
+) -> None:
+    """密码修改或删号提升代次后，所有旧设备 Token 都不能再刷新。"""
+
+    first = await create_refresh_session(fake_redis, user_id=7)
+    second = await create_refresh_session(fake_redis, user_id=7)
+
+    await revoke_user_refresh_sessions(fake_redis, user_id=7)
+
+    from app.services.refresh_sessions import rotate_refresh_session
+
+    assert await rotate_refresh_session(fake_redis, first) is None
+    assert await rotate_refresh_session(fake_redis, second) is None
+    new_session = await create_refresh_session(fake_redis, user_id=7)
+    assert await rotate_refresh_session(fake_redis, new_session) is not None
+
+
 async def test_redis_stores_digest_with_ttl_not_raw_refresh_token(
     client: AsyncClient, fake_redis: FakeRedis
 ) -> None:
@@ -157,12 +222,17 @@ async def test_redis_stores_digest_with_ttl_not_raw_refresh_token(
 
     await register(client)
     raw_token = (await login(client)).cookies.get("refresh_token")
-    keys = [key async for key in fake_redis.scan_iter("*:auth:refresh:*")]
+    keys = [key async for key in fake_redis.scan_iter("*:session:*")]
+    all_user_keys = [key async for key in fake_redis.scan_iter("*{auth-user-1}*")]
 
     assert raw_token
     assert len(keys) == 1
     assert raw_token not in keys[0]
     assert await fake_redis.ttl(keys[0]) > 0
+    assert all_user_keys
+    assert all("{auth-user-1}" in key for key in all_user_keys)
+    stored = await fake_redis.get(keys[0])
+    assert raw_token not in stored
 
 
 async def test_current_session_requires_a_valid_access_token(client: AsyncClient) -> None:

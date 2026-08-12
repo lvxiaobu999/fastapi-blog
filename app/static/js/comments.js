@@ -59,8 +59,11 @@ $(function () {
 
     function appendComment(comment) {
         // 每条评论都用 createElement/textContent 构建，用户正文不会作为 HTML 执行。
+        // 历史 HTTP 请求与实时广播并行，二者可能包含同一条刚创建的评论，按 ID 去重。
+        if ([...list.children].some((item) => item.dataset.commentId === String(comment.id))) return;
         const article = document.createElement("article");
         article.className = "comment-item";
+        article.dataset.commentId = String(comment.id);
         const avatar = document.createElement("img");
         avatar.className = "comment-avatar";
         avatar.src = comment.author.image_path;

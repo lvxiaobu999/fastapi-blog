@@ -10,6 +10,7 @@
 
 const TOKEN_KEY = "blog-access-token";
 const AUTH_REQUIRED_EVENT = "blog:auth-required";
+let refreshPromise = null;
 
 function responseData(result) {
     // 公共层统一拆掉成功响应信封，让业务脚本继续只关注 data 中的 Token、帖子或用户。
@@ -49,6 +50,25 @@ export function requireLogin(message = "登录状态已失效，请重新登录�
     document.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT, {detail: {message}}));
 }
 
+function refreshAccessToken() {
+    // 所有并发 401 共享同一次 Refresh。Token 采用单次轮换，若每个业务请求都独立刷新，
+    // 只有第一个能成功，其余请求会错误地把刚恢复的登录状态再次清除。
+    if (refreshPromise) return refreshPromise;
+    const deferred = $.Deferred();
+    refreshPromise = deferred.promise();
+    $.ajax({url: "/api/auth/refresh", method: "POST", dataType: "json"})
+        .done((result) => {
+            saveToken(responseData(result).access_token);
+            deferred.resolve();
+        })
+        .fail((xhr) => {
+            requireLogin();
+            deferred.reject(xhr);
+        })
+        .always(() => { refreshPromise = null; });
+    return deferred.promise();
+}
+
 export function ajaxRequest({
     url, method = "GET", data, formEncoded = false, auth = false, refreshAuth = true,
 }) {
@@ -78,15 +98,9 @@ export function ajaxRequest({
     // 第一次请求成功直接解包；只有受保护请求的 401 才进入刷新流程。
     request().done((result) => deferred.resolve(responseData(result))).fail((xhr) => {
         if (auth && refreshAuth && xhr.status === 401 && url !== "/api/auth/refresh") {
-            $.ajax({url: "/api/auth/refresh", method: "POST", dataType: "json"})
-                .done((result) => {
-                    saveToken(responseData(result).access_token);
-                    retryAfterRefresh();
-                })
-                .fail((refreshXhr) => {
-                    requireLogin();
-                    deferred.reject(refreshXhr);
-                });
+            refreshAccessToken()
+                .done(retryAfterRefresh)
+                .fail((refreshXhr) => deferred.reject(refreshXhr));
         } else {
             if (auth && xhr.status === 401) requireLogin();
             deferred.reject(xhr);
@@ -99,21 +113,37 @@ export function uploadFile(url, fieldName, file) {
     // 文件上传必须保留浏览器生成的 multipart boundary，因此不能手动设置 contentType。
     const formData = new FormData();
     formData.append(fieldName, file);
-    const headers = {};
-    if (getToken()) {
-        headers.Authorization = `Bearer ${getToken()}`;
-    }
-    return $.ajax({
-        url,
-        method: "POST",
-        headers,
-        data: formData,
-        processData: false,
-        contentType: false,
-        dataType: "json",
-    }).then(responseData).fail((xhr) => {
-        if (xhr.status === 401) requireLogin();
+    const request = () => {
+        const headers = {};
+        if (getToken()) headers.Authorization = `Bearer ${getToken()}`;
+        return $.ajax({
+            url,
+            method: "POST",
+            headers,
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: "json",
+        });
+    };
+    const deferred = $.Deferred();
+    const retryAfterRefresh = () => request()
+        .done((result) => deferred.resolve(responseData(result)))
+        .fail((xhr) => {
+            if (xhr.status === 401) requireLogin();
+            deferred.reject(xhr);
+        });
+    request().done((result) => deferred.resolve(responseData(result))).fail((xhr) => {
+        if (xhr.status !== 401) {
+            deferred.reject(xhr);
+            return;
+        }
+        // 图片上传与 JSON API 共享同一个 Refresh Promise，并在重试时读取最新 Token。
+        refreshAccessToken()
+            .done(retryAfterRefresh)
+            .fail((refreshXhr) => deferred.reject(refreshXhr));
     });
+    return deferred.promise();
 }
 
 export function errorMessages(xhr) {

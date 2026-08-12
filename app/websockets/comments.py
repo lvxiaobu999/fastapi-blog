@@ -42,12 +42,22 @@ class CommentConnectionManager:
             # 复制快照后立即释放锁。send_json() 可能等待网络，不能在等待期间阻塞
             # 其他用户加入或离开房间。
             sockets = tuple(self._rooms.get(post_id, ()))
-        stale: list[WebSocket] = []
-        for socket in sockets:
+
+        async def send(socket: WebSocket) -> WebSocket | None:
+            """限制单连接发送时间，避免慢客户端拖住整个房间。"""
+
             try:
-                await socket.send_json(message)
-            except RuntimeError:
-                stale.append(socket)
+                async with asyncio.timeout(2):
+                    await socket.send_json(message)
+                return None
+            except (RuntimeError, TimeoutError):
+                return socket
+
+        stale = [
+            socket
+            for socket in await asyncio.gather(*(send(socket) for socket in sockets))
+            if socket is not None
+        ]
         for socket in stale:
             await self.disconnect(post_id, socket)
 

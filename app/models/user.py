@@ -8,8 +8,8 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     # 仅用于静态类型提示，避免 User 与 Post 在运行时循环导入。
-    from app.models.post import Post
     from app.models.comment import Comment
+    from app.models.post import Post
 
 
 class User(Base):

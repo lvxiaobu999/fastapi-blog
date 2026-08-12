@@ -1,6 +1,8 @@
 """评论历史 HTTP 接口与实时 WebSocket 端点。"""
 
 import asyncio
+from collections import deque
+from time import monotonic
 from typing import Annotated
 
 import jwt
@@ -36,6 +38,31 @@ from app.websockets.comments import comment_connections
 router = APIRouter(prefix="/api/posts/{post_id}/comments", tags=["comments"])
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 AUTH_TIMEOUT_SECONDS = 10
+# 这两个常量组成滑动窗口：同一条 WebSocket 连接在任意连续 10 秒内最多提交 5 条消息。
+# Nginx 只能限制 WebSocket 握手，连接建立后的消息不会再经过 HTTP limit_req，所以应用层
+# 还需要这一层保护。
+COMMENT_RATE_LIMIT_WINDOW_SECONDS = 10
+COMMENT_RATE_LIMIT_MAX_MESSAGES = 5
+
+
+class WebSocketContextInvalidError(Exception):
+    """连接建立后的身份或文章状态已经失效。"""
+
+
+async def _enforce_comment_rate_limit(websocket: WebSocket, message_times: deque[float]) -> None:
+    """用 deque 维护滑动窗口，超限后发送错误并关闭连接。
+
+    deque 左侧保存最早时间：先移除已经离开 10 秒窗口的记录，再判断窗口内是否已有 5 条。
+    ``monotonic()`` 只计算时间间隔，不受系统时钟校准或手工修改日期影响。
+    """
+
+    now = monotonic()
+    while message_times and now - message_times[0] >= COMMENT_RATE_LIMIT_WINDOW_SECONDS:
+        message_times.popleft()
+    if len(message_times) >= COMMENT_RATE_LIMIT_MAX_MESSAGES:
+        await _send_websocket_error(websocket, "评论发送过于频繁，请稍后重试", close=True)
+        raise WebSocketContextInvalidError
+    message_times.append(now)
 
 
 async def _send_websocket_error(websocket: WebSocket, message: str, *, close: bool = False) -> None:
@@ -46,8 +73,10 @@ async def _send_websocket_error(websocket: WebSocket, message: str, *, close: bo
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
 
 
-async def _authenticate_websocket(websocket: WebSocket, session: AsyncSession) -> User | None:
-    """读取首条认证消息并返回数据库用户；失败时通知客户端并关闭连接。"""
+async def _authenticate_websocket(
+    websocket: WebSocket, session: AsyncSession
+) -> tuple[User, str] | None:
+    """读取首条认证消息，返回数据库用户和需要持续复核的 Access Token。"""
 
     # WebSocket 握手只建立网络连接，不能证明用户身份。限制首消息等待时间，避免
     # 未认证客户端永久占用服务器连接。
@@ -72,7 +101,32 @@ async def _authenticate_websocket(websocket: WebSocket, session: AsyncSession) -
     user = await session.get(User, user_id)
     if user is None:
         await _send_websocket_error(websocket, "登录状态已失效", close=True)
-    return user
+        return None
+    return user, auth_message.token
+
+
+async def _ensure_websocket_context(
+    websocket: WebSocket,
+    session: AsyncSession,
+    post_id: int,
+    user: User,
+    access_token: str,
+) -> None:
+    """每条评论落库前重新验证 Token、用户和文章发布状态。"""
+
+    try:
+        token_user_id = verify_access_token(access_token)
+    except (jwt.PyJWTError, TypeError, ValueError) as exc:
+        await _send_websocket_error(websocket, "登录状态已失效", close=True)
+        raise WebSocketContextInvalidError from exc
+    fresh_user = await session.get(User, user.id, populate_existing=True)
+    if fresh_user is None or token_user_id != user.id:
+        await _send_websocket_error(websocket, "登录状态已失效", close=True)
+        raise WebSocketContextInvalidError
+    fresh_post = await session.get(Post, post_id, populate_existing=True)
+    if fresh_post is None or not fresh_post.is_published:
+        await _send_websocket_error(websocket, "帖子已下架或不存在", close=True)
+        raise WebSocketContextInvalidError
 
 
 async def _create_comment_from_message(
@@ -80,10 +134,15 @@ async def _create_comment_from_message(
     session: AsyncSession,
     post_id: int,
     user: User,
+    access_token: str,
+    message_times: deque[float],
 ) -> CommentResponse | None:
     """接收并保存一条评论；可恢复的协议或业务错误不会断开连接。"""
 
     raw_message = await websocket.receive_json()
+    await _enforce_comment_rate_limit(websocket, message_times)
+    # 校验放在 receive 之后，避免连接等待期间 Token 过期却仍使用等待前的验证结果。
+    await _ensure_websocket_context(websocket, session, post_id, user, access_token)
     try:
         message = CommentCreateMessage.model_validate(raw_message)
     except ValidationError:
@@ -126,9 +185,12 @@ async def comment_websocket(websocket: WebSocket, post_id: int, session: DbSessi
             await _send_websocket_error(websocket, "帖子不存在", close=True)
             return
 
-        user = await _authenticate_websocket(websocket, session)
-        if user is None:
+        authenticated = await _authenticate_websocket(websocket, session)
+        if authenticated is None:
             return
+        user, access_token = authenticated
+        # 每条连接拥有自己的时间队列；断开连接后局部变量释放，不需要数据库表或定时清理。
+        message_times: deque[float] = deque()
 
         # 只有认证成功的连接才能进入房间并接收其他用户的实时评论。
         await comment_connections.register(post_id, websocket)
@@ -136,7 +198,9 @@ async def comment_websocket(websocket: WebSocket, post_id: int, session: DbSessi
         await websocket.send_json({"type": "authenticated"})
 
         while True:
-            comment = await _create_comment_from_message(websocket, session, post_id, user)
+            comment = await _create_comment_from_message(
+                websocket, session, post_id, user, access_token, message_times
+            )
             if comment is None:
                 continue
             # Service 已经提交事务；此时广播能保证页面收到的评论刷新后仍然存在。
@@ -147,7 +211,7 @@ async def comment_websocket(websocket: WebSocket, post_id: int, session: DbSessi
                 post_id,
                 {"type": "comment.created", "data": comment.model_dump(mode="json")},
             )
-    except (WebSocketDisconnect, ValueError):
+    except (WebSocketDisconnect, WebSocketContextInvalidError, ValueError):
         pass
     finally:
         if registered:

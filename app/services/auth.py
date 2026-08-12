@@ -22,6 +22,14 @@ from app.models import User
 # 本文件提供的 hash_password()/verify_password() 接口直接操作它。
 _password_hash = PasswordHash.recommended()
 
+# 登录失败必须尽量保持相同的密码计算成本。用户不存在时也校验这条固定 Argon2 哈希，
+# 避免攻击者通过响应耗时区分“账号不存在”和“密码错误”。该值不是任何真实账号的密码，
+# 也不参与登录成功判断；若以后调整密码哈希算法，应同步生成相同算法的新占位哈希。
+_DUMMY_PASSWORD_HASH = (
+    "$argon2id$v=19$m=65536,t=3,p=4$FZWKEj8K9h7s4Y2y+iHGzw$"
+    "PB7t+fH2+PGerWWsn2I+z+GWNoVLjFEsSBOtp/UM4Q0"
+)
+
 # JWT 是“签名后的身份声明”，不是加密容器；客户端可以读取其中的 sub/iat/exp，
 # 但不能在不知道 SECRET_KEY 的情况下伪造有效签名。因此 Token 里只放最小必要信息。
 
@@ -76,6 +84,7 @@ async def authenticate_user(session: AsyncSession, username: str, password: str)
         )
     )
     if user is None:
+        await verify_password(password, _DUMMY_PASSWORD_HASH)
         return None
     verified = await verify_password(password, user.hashed_password)
     return user if verified else None

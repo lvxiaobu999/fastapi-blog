@@ -4,13 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FastAPI Blog - {{ title }}</title>
-    <script>
-        (() => {
-            const saved = localStorage.getItem("blog-theme") || "auto";
-            const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-            document.documentElement.setAttribute("data-bs-theme", saved === "auto" ? (dark ? "dark" : "light") : saved);
-        })();
-    </script>
+    <script src="{{ url_for('static', path='js/admin-state.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
     {% block head %}{% endblock head %}

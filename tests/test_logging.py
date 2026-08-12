@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
+from app.core.config import get_settings
 from app.core.logging import (
     DailyFileHandler,
     JsonFormatter,
@@ -17,7 +18,6 @@ from app.core.logging import (
     configure_logging,
     reset_request_id,
 )
-from app.core.config import get_settings
 
 pytestmark = pytest.mark.anyio
 

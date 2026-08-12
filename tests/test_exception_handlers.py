@@ -10,8 +10,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.exception_handlers import (
     http_exception_handler,
-    unexpected_exception_handler,
     redis_exception_handler,
+    unexpected_exception_handler,
 )
 from app.main import app
 
@@ -106,7 +106,7 @@ async def test_unexpected_errors_hide_details_from_api_and_page() -> None:
     assert "database password leaked" not in api_response.body.decode()
     assert page_response.status_code == 500
     assert "服务器暂时出现异常".encode() in page_response.body
-    assert "database password leaked".encode() not in page_response.body
+    assert b"database password leaked" not in page_response.body
 
 
 async def test_redis_errors_return_safe_503_response() -> None:

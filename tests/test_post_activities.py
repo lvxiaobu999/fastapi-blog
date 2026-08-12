@@ -24,7 +24,12 @@ async def activity_data(
         await session.commit()
         post = await create_post(
             session,
-            PostCreate(title="Activity post", content="Body", user_id=user.id, category_id=seeded_categories["fastapi"]),
+            PostCreate(
+                title="Activity post",
+                content="Body",
+                user_id=user.id,
+                category_id=seeded_categories["fastapi"],
+            ),
         )
         session.add(Comment(content="My comment", post_id=post.id, user_id=user.id))
         await session.commit()
@@ -38,7 +43,9 @@ async def test_view_count_supports_guests_and_records_authenticated_footprint(
 
     guest = await client.post(f"/api/posts/{post_id}/view")
     member = await client.post(f"/api/posts/{post_id}/view", headers=headers)
-    footprints = await client.get("/api/me/activities/posts", params={"kind": "views"}, headers=headers)
+    footprints = await client.get(
+        "/api/me/activities/posts", params={"kind": "views"}, headers=headers
+    )
 
     assert guest.status_code == member.status_code == footprints.status_code == 200
     assert guest.json()["data"]["view_count"] == 1
@@ -55,7 +62,9 @@ async def test_like_and_favorite_toggle_without_duplicate_relations(
     liked = await client.post(f"/api/posts/{post_id}/like", headers=headers)
     favorited = await client.post(f"/api/posts/{post_id}/favorite", headers=headers)
     likes = await client.get("/api/me/activities/posts", params={"kind": "likes"}, headers=headers)
-    favorites = await client.get("/api/me/activities/posts", params={"kind": "favorites"}, headers=headers)
+    favorites = await client.get(
+        "/api/me/activities/posts", params={"kind": "favorites"}, headers=headers
+    )
     unliked = await client.post(f"/api/posts/{post_id}/like", headers=headers)
 
     assert unauthorized.status_code == 401

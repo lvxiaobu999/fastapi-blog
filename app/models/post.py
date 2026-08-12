@@ -14,9 +14,9 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     # 仅供类型检查器识别，不在运行时导入，避免 Post 与 User 互相导入。
-    from app.models.user import User
     from app.models.category import Category
     from app.models.comment import Comment
+    from app.models.user import User
 
 
 class Post(Base):
@@ -36,7 +36,9 @@ class Post(Base):
         Boolean, nullable=False, default=True, server_default=text("true")
     )
     # 总浏览量允许匿名访问累加；server_default 保证历史文章迁移后从 0 开始。
-    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    view_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
 
     # Python default 用于 ORM 新增；server_default 用于直接执行 INSERT。
     # timezone=True 表示业务层按带时区时间处理，Python 侧始终生成 UTC 时间。

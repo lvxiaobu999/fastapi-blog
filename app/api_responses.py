@@ -4,14 +4,12 @@
 """
 
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import Request
 
 from app.schemas.api import ApiErrorItem, ApiFailure, ApiSuccess, ResponseMeta
-
-DataT = TypeVar("DataT")
 
 # APIRouter 复用这份声明，使 Swagger 展示的失败契约与全局异常处理器一致。
 API_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -41,7 +39,7 @@ def response_meta(request: Request) -> ResponseMeta:
     )
 
 
-def success_response(
+def success_response[DataT](
     request: Request,
     data: DataT,
     *,

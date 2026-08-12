@@ -10,20 +10,7 @@
             FastAPI Blog
         {% endif %}
     </title>
-    <script>
-        (() => {
-            const savedTheme = localStorage.getItem("blog-theme") || "auto";
-            const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-            document.documentElement.setAttribute(
-                "data-bs-theme",
-                savedTheme === "auto" ? (isDark ? "dark" : "light") : savedTheme
-            );
-            // 在浏览器首次绘制导航栏之前确定本地登录状态，避免先显示登录按钮再切换。
-            document.documentElement.dataset.authState = localStorage.getItem("blog-access-token")
-                ? "user"
-                : "guest";
-        })();
-    </script>
+    <script src="{{ url_for('static', path='js/bootstrap-state.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
     {% block head %}{% endblock head %}

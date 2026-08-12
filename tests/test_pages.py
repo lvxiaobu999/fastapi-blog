@@ -105,13 +105,16 @@ async def test_layout_uses_auth_modals_and_es_modules(client: AsyncClient) -> No
     """导航登录注册只打开模态框，前端写操作由 ES module 接管。"""
 
     response = await client.get("/")
+    bootstrap_state = await client.get("/static/js/bootstrap-state.js")
     assert response.status_code == 200
     assert 'data-bs-target="#loginModal"' in response.text
     assert 'data-bs-target="#registerModal"' in response.text
     assert 'type="module"' in response.text
     assert "/static/js/auth.js" in response.text
-    assert "dataset.authState" in response.text
-    assert 'localStorage.getItem("blog-access-token")' in response.text
+    assert "/static/js/bootstrap-state.js" in response.text
+    assert "dataset.authState" in bootstrap_state.text
+    assert 'localStorage.getItem("blog-access-token")' in bootstrap_state.text
+    assert "dataset.authState" not in response.text
 
 
 async def test_layout_uses_global_debounced_search_modal(client: AsyncClient) -> None:
@@ -131,13 +134,18 @@ async def test_layout_uses_global_debounced_search_modal(client: AsyncClient) ->
 
 async def test_layout_includes_loading_and_session_scripts(client: AsyncClient) -> None:
     response = await client.get("/")
+    api_script = await client.get("/static/js/api.js")
     ui_script = await client.get("/static/js/ui.js")
+    bootstrap_state = await client.get("/static/js/bootstrap-state.js")
 
     assert response.status_code == 200
     assert "/static/js/auth.js" in response.text
     assert ui_script.status_code == 200
     assert "setButtonLoading" in ui_script.text
-    assert "dataset.authState" in response.text
+    assert "let refreshPromise = null" in api_script.text
+    assert "图片上传与 JSON API 共享同一个 Refresh Promise" in api_script.text
+    assert bootstrap_state.status_code == 200
+    assert "dataset.authState" in bootstrap_state.text
 
 
 async def test_layout_has_authenticated_user_menu_and_password_modal(client: AsyncClient) -> None:
@@ -154,7 +162,7 @@ async def test_layout_has_authenticated_user_menu_and_password_modal(client: Asy
     assert "theme-icon-moon" in response.text
     assert "theme-icon-sun" in response.text
     assert "theme-option" not in response.text
-    assert 'data-auth-admin' in response.text
+    assert "data-auth-admin" in response.text
     assert '/admin"' in response.text
     assert 'id="passwordModal"' in response.text
     assert "data-password-form" in response.text
@@ -169,7 +177,11 @@ async def test_layout_has_authenticated_user_menu_and_password_modal(client: Asy
 async def test_admin_pages_use_separate_layout(client: AsyncClient) -> None:
     """后台页面共享独立侧栏布局，并加载后台专用脚本。"""
 
-    dashboard, users, posts = await client.get("/admin"), await client.get("/admin/users"), await client.get("/admin/posts")
+    dashboard, users, posts = (
+        await client.get("/admin"),
+        await client.get("/admin/users"),
+        await client.get("/admin/posts"),
+    )
 
     assert dashboard.status_code == users.status_code == posts.status_code == 200
     assert "admin-shell" in dashboard.text
@@ -203,7 +215,7 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     editor = await client.get("/posts/new")
     viewer = await client.get(f"/posts/{post_id}")
 
-    assert "toastui-editor-all.min.js" in editor.text
+    assert "/static/vendor/toastui/toastui-editor-3.2.2.js" in editor.text
     assert 'id="post-editor"' in editor.text
     assert 'name="category_id"' in editor.text
     assert "data-post-preview" in editor.text
@@ -215,7 +227,9 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert 'id="post-preview-viewer"' in editor.text
     assert "/static/js/admin.js" in editor.text
     assert "/static/js/posts.js" in editor.text
-    assert "toastui-editor-all.min.js" in viewer.text
+    assert "/static/vendor/toastui/toastui-editor-3.2.2.js" in viewer.text
+    assert "uicdn.toast.com" not in editor.text
+    assert "uicdn.toast.com" not in viewer.text
     assert 'id="post-viewer"' in viewer.text
     assert "/static/js/posts.js" in viewer.text
     assert "data-post-interactions" in viewer.text

@@ -32,7 +32,7 @@ $(function () {
     const viewerSource = document.querySelector("#post-markdown");
     if (viewerElement && viewerSource) {
         const initializeViewer = () => {
-            // CDN 脚本可能尚未加载完成，用返回值告诉外层是否需要稍后重试。
+            // 站内第三方脚本可能尚未执行完成，用返回值告诉外层是否需要稍后重试。
             if (!window.toastui?.Editor?.factory) {
                 return false;
             }
@@ -49,7 +49,7 @@ $(function () {
             return true;
         };
 
-        // 模块脚本和 CDN 脚本的执行顺序在不同浏览器/缓存状态下可能不同，短暂重试
+        // 模块脚本和普通 vendor 脚本的执行顺序在不同浏览器/缓存状态下可能不同，短暂重试
         // 可以避免 Toast UI 尚未挂载到 window 时直接进入降级显示。
         if (!initializeViewer()) {
             window.setTimeout(initializeViewer, 100);
@@ -57,7 +57,7 @@ $(function () {
                 if (initializeViewer()) {
                     return;
                 }
-                // CDN 不可用时不要让正文区域看起来像“没有内容”；同时不把 Markdown 当 HTML 注入。
+                // vendor 脚本加载失败时仍显示 Markdown 原文，且不把 Markdown 当 HTML 注入。
                 viewerElement.textContent = viewerSource.value;
                 viewerElement.classList.add("post-viewer-fallback");
             }, 800);
@@ -66,6 +66,9 @@ $(function () {
 
     let editor = null;
     let previewViewer = null;
+    let postLoaded = true;
+    const postForm = document.querySelector("[data-post-form]");
+    const editingPostId = postForm?.dataset.postId;
     const coverInput = document.querySelector("#cover-image");
     const coverUrlInput = document.querySelector("#cover_image_url");
     const coverPreview = document.querySelector("[data-cover-preview]");
@@ -130,6 +133,31 @@ $(function () {
         });
     }
 
+    if (editingPostId) {
+        // 编辑页 HTML 不能读取 localStorage 中的 Bearer Token，因此服务端只渲染空表单。
+        // 在管理员 API 验证身份后再填充草稿，避免匿名 GET 泄露未发布内容。
+        postLoaded = false;
+        const submitButton = postForm.querySelector("[type=submit]");
+        submitButton.disabled = true;
+        ajaxRequest({url: `/api/posts/admin/${editingPostId}`, auth: true})
+            .done((post) => {
+                postForm.elements.title.value = post.title;
+                postForm.elements.category_id.value = String(post.category_id);
+                postForm.elements.summary.value = post.summary || "";
+                postForm.elements.is_published.checked = post.is_published;
+                document.querySelector("#content").value = post.content;
+                editor?.setMarkdown(post.content);
+                showCover(post.cover_image_url || "");
+                postLoaded = true;
+                submitButton.disabled = false;
+            })
+            .fail((xhr) => {
+                postForm.querySelector("[data-form-feedback]")
+                    .classList.remove("d-none");
+                postForm.querySelector("[data-form-feedback]").textContent = errorMessages(xhr);
+            });
+    }
+
     $("[data-post-preview]").on("click", function () {
         // ---------- 预览：读取编辑器当前值，不保存、不调用帖子写入 API ----------
         const title = $("[data-post-form] [name=title]").val().trim() || "未命名文章";
@@ -186,6 +214,7 @@ $(function () {
         const $form = $(this);
         const postId = $form.data("post-id");
         const button = $form.find("[type=submit]")[0];
+        if (!postLoaded) return;
         if (!setButtonLoading(button, true, postId ? "保存中…" : "发布中…")) return;
         ajaxRequest({
             url: postId ? `/api/posts/${postId}` : "/api/posts",

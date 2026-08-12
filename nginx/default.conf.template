@@ -4,6 +4,13 @@ map $http_upgrade $connection_upgrade {
     ''      close;
 }
 
+# limit_req_zone 只定义“怎样统计”，不会自动限制请求：key 使用客户端 IP，10m 是共享内存区
+# 大小，rate 是长期平均速率。后面的 location 再通过 limit_req 启用对应规则。
+# 通用区吸收异常扫描，认证区进一步限制密码和 Refresh Token 尝试。
+limit_req_zone $binary_remote_addr zone=public_per_ip:10m rate=20r/s;
+limit_req_zone $binary_remote_addr zone=auth_per_ip:10m rate=10r/m;
+limit_req_status 429;
+
 server {
     listen 80;
     listen [::]:80;
@@ -11,7 +18,8 @@ server {
 
     # 全站使用 HTTPS。签发第一张证书前可临时只运行 HTTP 配置完成域名验证。
     location / {
-        return 301 https://$host$request_uri;
+        # 使用部署配置中的固定域名，避免客户端伪造 Host 影响重定向目标。
+        return 301 https://${APP_DOMAIN}$request_uri;
     }
 }
 
@@ -32,11 +40,16 @@ server {
 
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
-    add_header X-Frame-Options SAMEORIGIN always;
+    add_header X-Frame-Options DENY always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
     # 确认所有子域都永久支持 HTTPS 后再启用 HSTS，错误启用可能导致浏览器长期拒绝 HTTP。
     # add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     location / {
+        # burst=40 允许短时间突发 40 个请求，nodelay 表示额度内立即处理而不是排队；超过
+        # 平均速率和突发容量后返回前面配置的 429。
+        limit_req zone=public_per_ip burst=40 nodelay;
         proxy_pass http://app:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -51,5 +64,20 @@ server {
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;
     }
-}
 
+    # 登录、Refresh 与公开注册共享更严格的每 IP 限流，降低撞库和暴力尝试压力。
+    location ~ ^/(?:api/auth/(?:token|oauth2-token|refresh)|api/users)$ {
+        # 这个正则只匹配登录、刷新和 /api/users 精确路径。它使用更慢的 auth_per_ip 区，
+        # 降低暴力猜密码和批量注册压力；业务 API 自身仍负责返回 401/409 等语义。
+        limit_req zone=auth_per_ip burst=5 nodelay;
+        proxy_pass http://app:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host ${APP_DOMAIN};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+}

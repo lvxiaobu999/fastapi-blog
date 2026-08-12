@@ -102,8 +102,11 @@ services:
         - python
         - -c
         - >-
-          import urllib.request;
-          urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)
+          import json, os, urllib.request;
+          host=json.loads(os.environ['ALLOWED_HOSTS'])[0];
+          request=urllib.request.Request(
+            'http://127.0.0.1:8000/health/ready', headers={'Host': host});
+          urllib.request.urlopen(request, timeout=3)
       interval: 30s
       timeout: 5s
       retries: 3

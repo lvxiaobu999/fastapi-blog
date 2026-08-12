@@ -5,7 +5,9 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Comment, Post, PostFavorite, PostLike, PostView
@@ -14,6 +16,37 @@ from app.schemas.post import (
     UserActivityItem,
     UserCommentActivityItem,
 )
+
+
+def _dialect_insert(session: AsyncSession, model):
+    """返回支持 ``ON CONFLICT`` 的当前数据库 Insert 构造器。
+
+    开发和测试使用 SQLite，生产使用 PostgreSQL；二者都有方言级 upsert API。Settings
+    已限制项目只使用这两种数据库，其他方言直接失败比退回有竞态的先查后写更安全。
+    """
+
+    dialect_name = session.get_bind().dialect.name
+    if dialect_name == "postgresql":
+        return postgresql_insert(model)
+    if dialect_name == "sqlite":
+        return sqlite_insert(model)
+    raise RuntimeError(f"Unsupported database dialect for atomic interaction: {dialect_name}")
+
+
+async def _toggle_relation(session: AsyncSession, model, user_id: int, post_id: int) -> None:
+    """原子切换点赞或收藏关系，使并发双击不再触发唯一约束 500。"""
+
+    statement = (
+        _dialect_insert(session, model)
+        .values(user_id=user_id, post_id=post_id)
+        .on_conflict_do_nothing(index_elements=["user_id", "post_id"])
+        .returning(model.id)
+    )
+    inserted_id = await session.scalar(statement)
+    if inserted_id is None:
+        await session.execute(
+            delete(model).where(model.user_id == user_id, model.post_id == post_id)
+        )
 
 
 async def interaction_state(
@@ -91,22 +124,17 @@ async def record_view(
         update(Post).where(Post.id == post.id).values(view_count=Post.view_count + 1)
     )
     if user_id is not None:
-        # 这段查询是在问：post_views 表里是否已经有“这个用户 + 这篇文章”的一行。
-        # scalar(select(PostView)) 返回 ORM 对象；没有匹配行时返回 None。
-        footprint = await session.scalar(
-            select(PostView).where(
-                PostView.user_id == user_id,
-                PostView.post_id == post.id,
+        now = datetime.now(UTC)
+        # 单条 upsert 同时覆盖首次浏览和更新时间；唯一约束冲突由数据库内部处理，不会
+        # 暴露成 IntegrityError，也不会回滚同一事务中的浏览量自增。
+        await session.execute(
+            _dialect_insert(session, PostView)
+            .values(user_id=user_id, post_id=post.id, viewed_at=now)
+            .on_conflict_do_update(
+                index_elements=["user_id", "post_id"],
+                set_={"viewed_at": now},
             )
         )
-        if footprint is None:
-            # 第一次浏览：内存中新建 PostView 并交给 Session 跟踪。
-            # add() 此时还没有提交数据库，真正写入发生在下面的 commit()。
-            session.add(PostView(user_id=user_id, post_id=post.id))
-        else:
-            # 再次浏览：不新增重复足迹，只修改已查到对象的最近浏览时间。
-            # ORM 发现属性变化后，会在 commit() 时自动生成 UPDATE SQL。
-            footprint.viewed_at = datetime.now(UTC)
 
     # 浏览量和足迹在同一个事务中提交：都成功才生效；提交失败则都不会完成。
     await session.commit()
@@ -125,19 +153,7 @@ async def toggle_like(session: AsyncSession, post: Post, user_id: int) -> PostIn
     的数据来源。提交后重新统计并返回按钮高亮状态和数量，供前端立即更新界面。
     """
 
-    # 先查询关系是否存在：存在代表当前已点赞，不存在代表当前未点赞。
-    row = await session.scalar(
-        select(PostLike).where(
-            PostLike.user_id == user_id,
-            PostLike.post_id == post.id,
-        )
-    )
-    if row is None:
-        # 未点赞 -> 新增关系。user_id 来自认证结果，不能由前端冒充指定。
-        session.add(PostLike(user_id=user_id, post_id=post.id))
-    else:
-        # 已点赞 -> 删除查到的关系，也就是“取消点赞”。
-        await session.delete(row)
+    await _toggle_relation(session, PostLike, user_id, post.id)
     # commit() 是事务边界；只有提交成功，其他请求才会看到这次变化。
     await session.commit()
     # 不手工猜测计数加一还是减一，重新查库可得到数据库的最终真实状态。
@@ -152,19 +168,7 @@ async def toggle_favorite(session: AsyncSession, post: Post, user_id: int) -> Po
     新增或删除，提交后返回最新计数和高亮状态；收藏记录也供“我的收藏”列表查询。
     """
 
-    # 收藏与点赞使用同一种“有则删除、无则新增”的切换逻辑，只是操作不同表。
-    row = await session.scalar(
-        select(PostFavorite).where(
-            PostFavorite.user_id == user_id,
-            PostFavorite.post_id == post.id,
-        )
-    )
-    if row is None:
-        # 第一次点击收藏。
-        session.add(PostFavorite(user_id=user_id, post_id=post.id))
-    else:
-        # 再次点击取消收藏。
-        await session.delete(row)
+    await _toggle_relation(session, PostFavorite, user_id, post.id)
     await session.commit()
     return await interaction_state(session, post, user_id)
 

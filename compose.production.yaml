@@ -25,7 +25,7 @@ services:
           "run",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)",
+          "import json, os, urllib.request; host=json.loads(os.environ['ALLOWED_HOSTS'])[0]; request=urllib.request.Request('http://127.0.0.1:8000/health/ready', headers={'Host': host}); urllib.request.urlopen(request, timeout=3)",
         ]
       interval: 30s
       timeout: 5s
@@ -47,6 +47,8 @@ services:
     environment:
       # 官方 Nginx 镜像启动时会把该值替换进 /etc/nginx/templates 下的模板。
       APP_DOMAIN: ${APP_DOMAIN:?请设置生产域名，例如 blog.example.com}
+      # 只替换 APP_DOMAIN，保留 $host、$request_uri 等 Nginx 运行时变量。
+      NGINX_ENVSUBST_FILTER: ^APP_DOMAIN$
     ports:
       - "80:80"
       - "443:443"
@@ -67,4 +69,3 @@ networks:
   # 8000 只在内部网络暴露；公网只能通过 Nginx 的 80/443 进入。
   backend:
     driver: bridge
-

@@ -1,3 +1,9 @@
+"""集中加载和校验开发/生产环境配置，不负责建立数据库或 Redis 连接。
+
+配置优先级是系统环境变量 > 环境专用文件 > 公共 ``.env`` > 代码默认值。Settings 在应用
+启动阶段把字符串转换成明确类型，并拒绝危险组合，让配置错误尽早暴露而不是运行中才报错。
+"""
+
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -39,6 +45,13 @@ class Settings(BaseSettings):
     env: Environment = "development"
     project_title: str = "FastAPI Blog"
     database_url: str
+    # 环境变量中的列表使用 JSON，例如 ALLOWED_HOSTS=["blog.example.com"]。这里不写协议、
+    # 端口或路径。TrustedHostMiddleware 只接受列出的 Host，防止伪造 Header 影响跳转、链接
+    # 或上游缓存；开发默认包含本机与测试客户端，生产必须显式配置真实域名。
+    allowed_hosts: list[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "::1", "test", "testserver"],
+        min_length=1,
+    )
     # 即使 JWT 尚未启用，也强制从环境读取密钥，避免后续接入认证时误用空值或硬编码默认值。
     # SECRET_KEY 用 SecretStr 防止配置对象 repr 或校验错误意外打印完整密钥；生产环境
     # 必须由部署平台注入随机值，不能复用仓库或开发机密钥。
@@ -76,7 +89,13 @@ class Settings(BaseSettings):
     log_retention_days: int = Field(default=14, ge=1, le=365)
 
     @model_validator(mode="after")
-    def validate_database_for_environment(self) -> "Settings":
+    def validate_environment_contract(self) -> "Settings":
+        """检查单个字段类型无法表达的跨配置安全规则。
+
+        例如 ``auth_cookie_secure`` 单独看只是布尔值，但与 ``env=production`` 组合时必须为
+        True。校验失败会阻止应用启动，避免带着不完整的生产配置继续运行。
+        """
+
         if self.env == "development" and not self.database_url.startswith("sqlite+aiosqlite://"):
             raise ValueError("Development DATABASE_URL must use SQLite with aiosqlite")
         if self.env == "production" and not self.database_url.startswith("postgresql+psycopg://"):
@@ -85,8 +104,25 @@ class Settings(BaseSettings):
         # Secure 仍可能让浏览器在跳转前的 HTTP 请求中携带 Cookie，因此必须启动失败。
         if self.env == "production" and not self.auth_cookie_secure:
             raise ValueError("Production AUTH_COOKIE_SECURE must be true")
+        normalized_hosts = [host.strip().lower() for host in self.allowed_hosts]
+        if any(
+            not host or host == "*" or "://" in host or "/" in host or " " in host
+            for host in normalized_hosts
+        ):
+            raise ValueError(
+                "ALLOWED_HOSTS must contain explicit hostnames without schemes or paths"
+            )
+        self.allowed_hosts = list(dict.fromkeys(normalized_hosts))
+        if self.env == "production" and {"test", "testserver"} & set(self.allowed_hosts):
+            raise ValueError("Production ALLOWED_HOSTS must be explicitly configured")
+        if self.env == "production" and len(self.secret_key.get_secret_value()) < 32:
+            raise ValueError("Production SECRET_KEY must contain at least 32 characters")
         if self.refresh_idle_timeout_minutes <= self.access_token_expire_minutes:
             raise ValueError("REFRESH_IDLE_TIMEOUT_MINUTES must exceed ACCESS_TOKEN_EXPIRE_MINUTES")
+        if "{" in self.redis_key_prefix or "}" in self.redis_key_prefix:
+            # Refresh Session 自己使用花括号控制 Redis Cluster hash slot；允许配置层注入
+            # 花括号会改变脚本 Key 的分片结果，使本应原子的 Lua 操作在集群中失败。
+            raise ValueError("REDIS_KEY_PREFIX must not contain Redis hash tag braces")
         redis_url = self.redis_url.get_secret_value()
         if not redis_url.startswith(("redis://", "rediss://")):
             raise ValueError("REDIS_URL must use redis:// or rediss://")

@@ -1,10 +1,12 @@
 """用户异步 CRUD 接口测试。"""
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.main import app
 from app.models import User
 from app.services.auth import create_access_token, verify_password
 
@@ -96,7 +98,10 @@ async def test_user_can_only_update_nickname_and_email(
         assert await verify_password("password123", stored_user.hashed_password)
 
 
-@pytest.mark.parametrize("field,value", [("username", "renamed"), ("password", "newpassword123"), ("image_file", "avatar.png")])
+@pytest.mark.parametrize(
+    "field,value",
+    [("username", "renamed"), ("password", "newpassword123"), ("image_file", "avatar.png")],
+)
 async def test_profile_update_rejects_fields_with_dedicated_management(
     client: AsyncClient, field: str, value: str
 ) -> None:
@@ -155,6 +160,93 @@ async def test_user_can_upload_valid_avatar(
     assert valid.status_code == 200
     assert valid.json()["data"]["image_path"].startswith("/media/profile_pics/")
     assert len(list((tmp_path / "profile_pics").glob("*.png"))) == 1
+
+
+async def test_replacing_avatar_deletes_previous_file(
+    client: AsyncClient,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """数据库成功绑定新头像后，旧文件应被清理且目录只保留当前头像。"""
+
+    from app.services import images as image_service
+
+    user_id = (await create_user(client)).json()["data"]["id"]
+    headers = auth_headers(user_id)
+    target_dir = tmp_path / "profile_pics"
+    monkeypatch.setattr(image_service, "PROFILE_IMAGE_DIR", target_dir)
+
+    first = await client.post(
+        "/api/users/me/avatar",
+        headers=headers,
+        files={"avatar": ("first.png", b"\x89PNG\r\n\x1a\nfirst", "image/png")},
+    )
+    second = await client.post(
+        "/api/users/me/avatar",
+        headers=headers,
+        files={"avatar": ("second.png", b"\x89PNG\r\n\x1a\nsecond", "image/png")},
+    )
+
+    assert first.status_code == second.status_code == 200
+    assert first.json()["data"]["image_file"] != second.json()["data"]["image_file"]
+    assert [path.name for path in target_dir.glob("*.png")] == [second.json()["data"]["image_file"]]
+
+
+async def test_avatar_database_failure_removes_new_file(
+    client: AsyncClient,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """头像已写盘但数据库提交失败时，应补偿删除没有引用的新文件。"""
+
+    from app.routers import api_users as api_users_router
+    from app.services import images as image_service
+
+    user_id = (await create_user(client)).json()["data"]["id"]
+    headers = auth_headers(user_id)
+    target_dir = tmp_path / "profile_pics"
+    monkeypatch.setattr(image_service, "PROFILE_IMAGE_DIR", target_dir)
+
+    async def fail_to_store_avatar(*_args, **_kwargs):
+        raise SQLAlchemyError("simulated commit failure")
+
+    monkeypatch.setattr(api_users_router.user_service, "set_profile_image", fail_to_store_avatar)
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://test") as failure_client:
+        response = await failure_client.post(
+            "/api/users/me/avatar",
+            headers=headers,
+            files={"avatar": ("avatar.png", b"\x89PNG\r\n\x1a\nimage", "image/png")},
+        )
+
+    assert response.status_code == 500
+    assert list(target_dir.glob("*")) == []
+
+
+async def test_deleting_user_removes_avatar_file(
+    client: AsyncClient,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """账号删除提交成功后，应同时清理该用户最后使用的头像文件。"""
+
+    from app.services import images as image_service
+
+    user_id = (await create_user(client)).json()["data"]["id"]
+    headers = auth_headers(user_id)
+    target_dir = tmp_path / "profile_pics"
+    monkeypatch.setattr(image_service, "PROFILE_IMAGE_DIR", target_dir)
+
+    uploaded = await client.post(
+        "/api/users/me/avatar",
+        headers=headers,
+        files={"avatar": ("avatar.png", b"\x89PNG\r\n\x1a\nimage", "image/png")},
+    )
+    deleted = await client.delete(f"/api/users/{user_id}", headers=headers)
+
+    assert uploaded.status_code == 200
+    assert deleted.status_code == 200
+    assert list(target_dir.glob("*")) == []
 
 
 async def test_admin_user_crud_is_protected(

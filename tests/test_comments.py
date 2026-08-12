@@ -1,5 +1,6 @@
 """评论持久化、公开接口与 WebSocket 协议测试。"""
 
+from collections import deque
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -17,6 +18,38 @@ from app.services import comments as comment_service
 from app.services.posts import create_post
 
 pytestmark = pytest.mark.anyio
+
+
+async def test_websocket_comment_rate_limit_closes_burst_connection() -> None:
+    """单连接在时间窗口内超过消息上限时应收到错误并关闭。"""
+
+    from app.routers.comments import (
+        COMMENT_RATE_LIMIT_MAX_MESSAGES,
+        WebSocketContextInvalidError,
+        _enforce_comment_rate_limit,
+    )
+
+    class FakeWebSocket:
+        def __init__(self) -> None:
+            self.messages: list[dict[str, str]] = []
+            self.closed = False
+
+        async def send_json(self, message: dict[str, str]) -> None:
+            self.messages.append(message)
+
+        async def close(self, *, code: int) -> None:
+            self.closed = code == 1008
+
+    websocket = FakeWebSocket()
+    message_times: deque[float] = deque()
+    for _ in range(COMMENT_RATE_LIMIT_MAX_MESSAGES):
+        await _enforce_comment_rate_limit(websocket, message_times)  # type: ignore[arg-type]
+
+    with pytest.raises(WebSocketContextInvalidError):
+        await _enforce_comment_rate_limit(websocket, message_times)  # type: ignore[arg-type]
+
+    assert websocket.messages[-1]["type"] == "error"
+    assert websocket.closed is True
 
 
 @pytest.fixture
@@ -108,7 +141,7 @@ def test_comment_websocket_authenticates_and_broadcasts(monkeypatch: pytest.Monk
     post = SimpleNamespace(id=11, is_published=True)
 
     class FakeSession:
-        async def get(self, model, key):
+        async def get(self, model, key, **_kwargs):
             return post if model.__name__ == "Post" else user
 
     async def override_get_db():
@@ -134,17 +167,17 @@ def test_comment_websocket_authenticates_and_broadcasts(monkeypatch: pytest.Monk
     monkeypatch.setattr(comments_router.comment_service, "create_comment", fake_create_comment)
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as test_client:
-            with test_client.websocket_connect("/api/posts/11/comments/ws") as websocket:
-                websocket.send_json({"type": "authenticate", "token": "valid"})
-                assert websocket.receive_json()["type"] == "authenticated"
-                websocket.send_json(
-                    {"type": "comment.create", "content": "实时评论", "parent_id": 1}
-                )
-                assert websocket.receive_json()["type"] == "comment.submitted"
-                message = websocket.receive_json()
-                assert message["type"] == "comment.created"
-                assert message["data"]["content"] == "实时评论"
-                assert message["data"]["parent_id"] == 1
+        with (
+            TestClient(app) as test_client,
+            test_client.websocket_connect("/api/posts/11/comments/ws") as websocket,
+        ):
+            websocket.send_json({"type": "authenticate", "token": "valid"})
+            assert websocket.receive_json()["type"] == "authenticated"
+            websocket.send_json({"type": "comment.create", "content": "实时评论", "parent_id": 1})
+            assert websocket.receive_json()["type"] == "comment.submitted"
+            message = websocket.receive_json()
+            assert message["type"] == "comment.created"
+            assert message["data"]["content"] == "实时评论"
+            assert message["data"]["parent_id"] == 1
     finally:
         app.dependency_overrides.pop(get_db, None)
