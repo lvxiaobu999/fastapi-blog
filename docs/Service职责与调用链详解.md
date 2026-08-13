@@ -277,22 +277,24 @@ Redis，只有登录、刷新、退出和账户安全事件进入有状态会话
 
 - 入口：管理员发帖 API、测试数据准备。
 - 查询作者；不存在抛 `PostAuthorNotFoundError`。
-- 按 `category_id` 查分类；内部旧调用不传分类时回退“其它”；不存在抛 `PostCategoryNotFoundError`。
-- 通过 `author` 和 `category` 关系构造 Post，add + commit。
-- 再调用 `get_post()` 重新加载作者和分类，避免异步序列化触发懒加载。
+- 按 `category_ids` 批量查分类；内部旧调用仍可传单个 `category_id` 并回退“其它”；只要有
+  一个 ID 不存在就抛 `PostCategoryNotFoundError`。
+- 通过 `author` 和 `categories` 多对多关系构造 Post，add + commit。
+- 再调用 `get_post()` 重新加载作者和分类集合，避免异步序列化触发懒加载。
 
 ### `update_post(session, post, data)`
 
 - 入口：文章编辑 API。
 - `exclude_unset=True` 只更新 PATCH 实际提供的字段。
 - 空 PATCH 直接返回原 Post，不产生无意义 commit。
-- 分类字段单独查询并设置关系，标题和正文逐字段赋值。
+- `category_ids` 字段单独批量查询并整体替换关系，标题和正文逐字段赋值；显式提交空数组
+  会在 Schema 层返回 422。
 - commit 后调用 `get_post()` 返回完整更新结果。
 
 ### `get_post(session, post_id)`
 
 - 入口：文章详情页/API、编辑页、互动 Router、评论 Router。
-- 使用 `selectinload` 一次准备作者和分类。
+- 使用 `selectinload` 一次准备作者和分类集合。
 - 返回：`Post | None`。
 - 只读，不提交。
 
@@ -305,7 +307,8 @@ Redis，只有登录、刷新、退出和账户安全事件进入有状态会话
 
 - 入口：首页、文章列表 API、后台文章管理。
 - 可选按标题/正文关键词和分类 slug 过滤。
-- 预加载作者/分类，按创建时间和 ID 倒序，应用分页。
+- 预加载作者/分类集合，按创建时间和 ID 倒序，应用分页；分类筛选使用关联关系的 EXISTS，
+  一个帖子命中任一分类即可返回且不会重复。
 - 返回 `list[Post]`，只读不提交。
 
 ### `search_post_titles(session, params)`
@@ -330,6 +333,7 @@ Redis，只有登录、刷新、退出和账户安全事件进入有状态会话
 | --- | --- | --- |
 | `list_categories()` | 首页类型标签、发帖分类下拉；按 `sort_order/id` 排序 | `list[Category]` |
 | `get_category_by_id()` | 创建/更新文章时验证外键目标 | `Category | None` |
+| `get_categories_by_ids()` | 批量验证创建/更新文章的多分类 ID，按运营排序返回 | `list[Category]` |
 | `get_category_by_slug()` | URL 分类筛选和内部查询 | `Category | None` |
 | `get_default_category()` | 内部旧调用未传分类时查 slug=`other` | `Category | None` |
 
@@ -472,7 +476,7 @@ Service 抛业务异常
 | Service 异常/结果 | Router 解释 |
 | --- | --- |
 | `UserAlreadyExistsError` | 409 用户名或邮箱冲突 |
-| `PostCategoryNotFoundError` | 404 分类不存在 |
+| `PostCategoryNotFoundError` | 404 一个或多个分类不存在 |
 | `CommentParentNotFoundError` | WebSocket error 消息 |
 | `InvalidImageError` | 400 图片无效或超限 |
 | `authenticate_user() -> None` | 401 登录失败 |

@@ -82,8 +82,8 @@ api_users_router
 | `GET /register` | 直接访问兼容注册页 | 渲染 `register.html`；注册写入实际走 `POST /api/users` |
 | `GET /profile/{user_id}` | 头像菜单“编辑个人信息” | 查用户；不存在返回 404；渲染资料与头像即时上传界面 |
 | `GET /me/activities` | 头像菜单“评论/赞过/收藏/我的足迹” | 只渲染活动页外壳；`post-activities.js` 再按 `tab` 请求受保护 API |
-| `GET /posts/new` | 管理员头像菜单“发布新帖子” | 查询分类并渲染后台编辑器；真正发布走 `POST /api/posts` |
-| `GET /posts/{id}/edit` | 后台文章管理“编辑” | 查文章和分类，渲染带原值的编辑器；保存走 `PATCH /api/posts/{id}` |
+| `GET /posts/new` | 管理员头像菜单“发布新帖子” | 查询分类并渲染多分类复选框；真正发布走 `POST /api/posts` |
+| `GET /posts/{id}/edit` | 后台文章管理“编辑” | 查文章和分类，渲染带原值的多分类编辑器；保存走 `PATCH /api/posts/{id}` |
 | `GET /posts/{id}` | 文章列表、搜索结果、活动历史中的文章链接 | 查文章并渲染详情；页面脚本随后记录浏览并加载评论 |
 | `GET /admin` | 头像菜单“进入我的后台” | 渲染后台概览外壳；`admin.js` 再验证当前用户是否为管理员 |
 | `GET /admin/users` | 后台侧栏“用户管理” | 渲染用户管理工作区；数据来自 `/api/admin/users` |
@@ -177,11 +177,11 @@ api_users_router
 | 方法与路径 | 从哪里触发 | 主要工作 |
 | --- | --- | --- |
 | `POST /api/posts/images` | Toast UI 编辑器插入图片 | 要求管理员；校验并保存文章图片，返回可访问 URL |
-| `POST /api/posts` | 发帖页提交 | 要求管理员；作者 ID 只能来自 Token；验证分类并创建文章 |
-| `GET /api/posts` | 后台文章列表、API 调用 | 按关键词、分类和分页查询，返回文章、作者、分类、浏览数 |
+| `POST /api/posts` | 发帖页提交 | 要求管理员；作者 ID 只能来自 Token；验证 `category_ids` 并创建文章 |
+| `GET /api/posts` | 公开文章列表、API 调用 | 按关键词、分类和分页查询，返回文章、作者、全部分类和浏览数 |
 | `GET /api/posts/search` | 全局搜索框输入后 300ms 防抖触发 | 只按标题搜索少量结果，减少每次键盘输入的响应体积 |
 | `GET /api/posts/{id}` | API/后台读取单篇文章 | 查询文章，不存在返回 JSON 404 |
-| `PATCH /api/posts/{id}` | 编辑文章提交 | 要求管理员；只更新实际传入字段，分类不存在返回 404 |
+| `PATCH /api/posts/{id}` | 编辑文章提交 | 要求管理员；只更新实际传入字段，分类 ID 不存在返回 404 |
 | `DELETE /api/posts/{id}` | 后台文章删除按钮 | 要求管理员；删除文章并提交事务，关联评论/活动由外键清理 |
 
 搜索入口链：
