@@ -50,7 +50,7 @@ async def test_create_post_with_author(session: AsyncSession, author: User) -> N
     assert post.id is not None
     assert post.content == "Post body"
     assert post.user_id == author.id
-    assert post.category.slug == "other"
+    assert [category.slug for category in post.categories] == ["other"]
 
 
 async def test_create_and_update_post_publishing_fields(
@@ -95,7 +95,7 @@ async def test_create_post_rejects_missing_category(session: AsyncSession, autho
                 title="Missing category",
                 content="Post body",
                 user_id=author.id,
-                category_id=999,
+                category_ids=[999],
             ),
         )
 
@@ -203,13 +203,13 @@ async def test_list_posts_filters_category_slug(
     author: User,
     seeded_categories: dict[str, int],
 ) -> None:
-    fastapi_post = await create_post(
+    multi_category_post = await create_post(
         session,
         PostCreate(
             title="FastAPI filters",
             content="Body",
             user_id=author.id,
-            category_id=seeded_categories["fastapi"],
+            category_ids=[seeded_categories["fastapi"], seeded_categories["python"]],
         ),
     )
     await create_post(
@@ -218,13 +218,46 @@ async def test_list_posts_filters_category_slug(
             title="Python filters",
             content="Body",
             user_id=author.id,
-            category_id=seeded_categories["python"],
+            category_ids=[seeded_categories["python"]],
         ),
     )
 
-    results = await list_posts(session, PostQueryParams(category="fastapi"))
+    fastapi_results = await list_posts(session, PostQueryParams(category="fastapi"))
+    python_results = await list_posts(session, PostQueryParams(category="python"))
 
-    assert [post.id for post in results] == [fastapi_post.id]
+    assert [post.id for post in fastapi_results] == [multi_category_post.id]
+    assert multi_category_post.id in [post.id for post in python_results]
+    assert [category.slug for category in multi_category_post.categories] == [
+        "fastapi",
+        "python",
+    ]
+
+
+async def test_update_post_replaces_category_set(
+    session: AsyncSession,
+    author: User,
+    seeded_categories: dict[str, int],
+) -> None:
+    """编辑帖子时提交的新分类集合应整体替换旧关系。"""
+
+    post = await create_post(
+        session,
+        PostCreate(
+            title="Category update",
+            content="Body",
+            user_id=author.id,
+            category_ids=[seeded_categories["fastapi"], seeded_categories["python"]],
+        ),
+    )
+
+    updated = await update_post(
+        session,
+        post,
+        PostUpdate(category_ids=[seeded_categories["other"]]),
+    )
+
+    assert updated.category_ids == [seeded_categories["other"]]
+    assert [category.slug for category in updated.categories] == ["other"]
 
 
 async def test_title_search_does_not_match_content(session: AsyncSession, author: User) -> None:

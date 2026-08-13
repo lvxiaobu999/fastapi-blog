@@ -27,5 +27,8 @@ class Category(Base):
     # sort_order 只决定二级导航展示顺序，不参与帖子创建时间等业务排序。
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    # 分类被引用时由数据库 RESTRICT 保护，不允许意外删除后让帖子失去分类。
-    posts: Mapped[list["Post"]] = relationship(back_populates="category")
+    # 多对多关系的关联表定义在 post 模块；passive_deletes 保留数据库 RESTRICT 语义，分类
+    # 被任一帖子引用时不能被静默删除。
+    posts: Mapped[list["Post"]] = relationship(
+        secondary="post_categories", back_populates="categories", passive_deletes=True
+    )

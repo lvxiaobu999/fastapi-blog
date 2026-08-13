@@ -37,6 +37,24 @@ async def get_category_by_id(session: AsyncSession, category_id: int) -> Categor
     return await session.get(Category, category_id)
 
 
+async def get_categories_by_ids(
+    session: AsyncSession, category_ids: list[int]
+) -> list[Category]:
+    """批量读取帖子要关联的分类，并按页面展示顺序返回。
+
+    使用单条 ``IN`` 查询避免为每个复选项分别访问数据库。调用方必须比较返回数量与去重后
+    的请求数量；数量不一致表示至少一个 ID 不存在，此函数不会用部分结果静默保存帖子。
+    """
+
+    statement = (
+        select(Category)
+        .where(Category.id.in_(category_ids))
+        .order_by(Category.sort_order, Category.id)
+    )
+    result = await session.scalars(statement)
+    return list(result)
+
+
 async def get_category_by_slug(session: AsyncSession, slug: str) -> Category | None:
     """把 URL 中稳定、可读的分类标识转换成 Category。
 

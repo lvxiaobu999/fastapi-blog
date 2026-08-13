@@ -28,7 +28,7 @@ async def activity_data(
                 title="Activity post",
                 content="Body",
                 user_id=user.id,
-                category_id=seeded_categories["fastapi"],
+                category_ids=[seeded_categories["fastapi"]],
             ),
         )
         session.add(Comment(content="My comment", post_id=post.id, user_id=user.id))

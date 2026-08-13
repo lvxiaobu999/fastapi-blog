@@ -78,6 +78,18 @@ $(function () {
     const coverRemoveButton = document.querySelector("[data-cover-remove]");
     const coverFeedback = document.querySelector("[data-cover-feedback]");
 
+    function selectedCategoryIds() {
+        return [...postForm.querySelectorAll("[name=category_ids]:checked")]
+            .map((input) => Number(input.value));
+    }
+
+    function showCategories(categoryIds) {
+        const selectedIds = new Set(categoryIds.map(String));
+        postForm.querySelectorAll("[name=category_ids]").forEach((input) => {
+            input.checked = selectedIds.has(input.value);
+        });
+    }
+
     function showCover(url) {
         // 隐藏字段保存上传接口返回的站内 URL，提交文章时再与其他字段一起写入数据库。
         coverUrlInput.value = url || "";
@@ -209,7 +221,7 @@ $(function () {
         ajaxRequest({url: `/api/posts/admin/${editingPostId}`, auth: true})
             .done((post) => {
                 postForm.elements.title.value = post.title;
-                postForm.elements.category_id.value = String(post.category_id);
+                showCategories(post.category_ids);
                 postForm.elements.summary.value = post.summary || "";
                 postForm.elements.is_published.checked = post.is_published;
                 editorSource.value = post.content;
@@ -289,7 +301,7 @@ $(function () {
             auth: true,
             data: {
                 title: $form.find("[name=title]").val(),
-                category_id: Number($form.find("[name=category_id]").val()),
+                category_ids: selectedCategoryIds(),
                 summary: $form.find("[name=summary]").val().trim() || null,
                 cover_image_url: coverUrlInput?.value || null,
                 content: editor ? editor.getMarkdown() : $form.find("[name=content]").val(),

@@ -38,9 +38,11 @@
                 <div class="post-meta">
                     <a href="#">{{ post.author.nickname }}</a>
                     <time datetime="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime("%Y-%m-%d") }}</time>
-                    <a class="post-category" href="{{ url_for('posts') }}?category={{ post.category.slug | urlencode }}">
-                        {{ post.category.name }}
+                    {% for category in post.categories %}
+                    <a class="post-category" href="{{ url_for('posts') }}?category={{ category.slug | urlencode }}">
+                        {{ category.name }}
                     </a>
+                    {% endfor %}
                     <span class="post-view-stat">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="3"/></svg>
                         {{ post.view_count }} 次浏览

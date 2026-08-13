@@ -83,7 +83,7 @@ async def create_post(
         )
     except post_service.PostCategoryNotFoundError as exc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="One or more categories not found"
         ) from exc
     # Service 返回 SQLAlchemy Post；Router 在公开响应边界转换为 PostResponse，既过滤
     # ORM 内部字段，也让 ApiSuccess 的泛型参数与声明的返回类型完全一致。
@@ -168,7 +168,7 @@ async def update_post(
         updated = await post_service.update_post(session, post, data)
     except post_service.PostCategoryNotFoundError as exc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="One or more categories not found"
         ) from exc
     return success_response(request, PostResponse.model_validate(updated))
 

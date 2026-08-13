@@ -1,13 +1,24 @@
 """帖子 ORM 模型。
 
-Post 通过 ``user_id`` 外键保存作者身份，通过 ``author`` 关系属性读取完整用户对象。
-一个用户可以拥有多篇帖子，每篇帖子只能属于一个用户。
+Post 通过 ``user_id`` 外键保存作者身份，通过 ``author`` 关系属性读取完整用户对象；
+帖子与分类通过 ``post_categories`` 关联表建立多对多关系。本模块不负责分类存在性校验。
 """
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,6 +28,21 @@ if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.comment import Comment
     from app.models.user import User
+
+
+# 联合主键同时承担唯一约束：同一帖子不能重复关联同一分类。两个外键的删除策略不同，
+# 删除帖子时关联记录可自动清理；分类仍被帖子引用时则拒绝删除，避免静默改变文章归类。
+post_categories = Table(
+    "post_categories",
+    Base.metadata,
+    Column("post_id", ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "category_id",
+        ForeignKey("categories.id", ondelete="RESTRICT"),
+        primary_key=True,
+        index=True,
+    ),
+)
 
 
 class Post(Base):
@@ -57,17 +83,23 @@ class Post(Base):
         index=True,
     )
 
-    # 每篇帖子必须属于一个分类；分类删除使用 RESTRICT，避免文章变成无分类孤儿数据。
-    category_id: Mapped[int] = mapped_column(
-        ForeignKey("categories.id", ondelete="RESTRICT"),
-        nullable=False,
-        index=True,
-    )
-
     # author 不是数据库列，而是 SQLAlchemy 根据 user_id 加载出的 User 对象。
     # back_populates 与 User.posts 成对出现，修改任意一侧时 ORM 能同步关系状态。
     author: Mapped["User"] = relationship(back_populates="posts")
-    category: Mapped["Category"] = relationship(back_populates="posts")
+    # categories 不是 posts 表中的列。secondary 指向关联表，order_by 保证 API、模板和后台
+    # 始终按运营排序输出；passive_deletes 让删除帖子时由数据库级联清理关联记录。
+    categories: Mapped[list["Category"]] = relationship(
+        secondary=post_categories,
+        back_populates="posts",
+        order_by="(Category.sort_order, Category.id)",
+        passive_deletes=True,
+    )
     comments: Mapped[list["Comment"]] = relationship(
         back_populates="post", cascade="all, delete-orphan", passive_deletes=True
     )
+
+    @property
+    def category_ids(self) -> list[int]:
+        """返回按展示顺序排列的分类 ID，供公开响应直接序列化。"""
+
+        return [category.id for category in self.categories]

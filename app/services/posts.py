@@ -15,7 +15,7 @@ from app.services import categories as category_service
 
 # ==================== Service 入口导读 ====================
 # 上游调用者：pages、api_posts、api_activities 和 comments Router。
-# 本模块负责文章详情/列表/标题搜索以及创建、更新、删除，并预加载 author/category。
+# 本模块负责文章详情/列表/标题搜索以及创建、更新、删除，并预加载 author/categories。
 # 分类存在性由 categories Service 协助验证；Router 负责管理员权限和 HTTP 异常转换。
 # create/update/delete 在本模块提交事务，纯查询函数不会 commit。
 
@@ -25,13 +25,23 @@ class PostAuthorNotFoundError(Exception):
 
 
 class PostCategoryNotFoundError(Exception):
-    """创建或更新帖子时指定的分类不存在。"""
+    """创建或更新帖子时指定的一个或多个分类不存在。"""
+
+
+async def _resolve_categories(session: AsyncSession, category_ids: list[int]) -> list[Category]:
+    """一次性解析全部分类；任何 ID 不存在都拒绝整次写入。"""
+
+    unique_ids = list(dict.fromkeys(category_ids))
+    categories = await category_service.get_categories_by_ids(session, unique_ids)
+    if len(categories) != len(unique_ids):
+        raise PostCategoryNotFoundError
+    return categories
 
 
 async def create_post(session: AsyncSession, data: PostCreate) -> Post:
     """完成有权限用户在后台发布文章的持久化流程。
 
-    发布表单提交标题、正文和分类，认证用户 ID 由 Router 写入请求数据。这里确认作者和
+    发布表单提交标题、正文和多个分类，认证用户 ID 由 Router 写入请求数据。这里确认作者和
     分类真实存在，防止生成无法展示的文章；保存后重新加载作者/分类，使创建响应能直接
     更新或跳转页面。权限不在这里判断，同一函数也可供测试和可信内部任务复用。
     """
@@ -40,13 +50,16 @@ async def create_post(session: AsyncSession, data: PostCreate) -> Post:
     if author is None:
         raise PostAuthorNotFoundError
 
-    category = (
-        await category_service.get_category_by_id(session, data.category_id)
-        if data.category_id is not None
-        else await category_service.get_default_category(session)
-    )
-    if category is None:
-        raise PostCategoryNotFoundError
+    if data.category_ids is not None:
+        categories = await _resolve_categories(session, data.category_ids)
+    elif data.category_id is not None:
+        # 兼容可信内部旧调用；公开 API 已只接受 category_ids。
+        categories = await _resolve_categories(session, [data.category_id])
+    else:
+        default_category = await category_service.get_default_category(session)
+        if default_category is None:
+            raise PostCategoryNotFoundError
+        categories = [default_category]
 
     post = Post(
         title=data.title,
@@ -57,7 +70,7 @@ async def create_post(session: AsyncSession, data: PostCreate) -> Post:
         # 通过关系属性赋值后，SQLAlchemy 会在 flush 时同步填写外键；这样返回对象也已经
         # 持有作者和分类，不需要在响应序列化阶段触发异步懒加载。
         author=author,
-        category=category,
+        categories=categories,
     )
     session.add(post)
     await session.commit()
@@ -82,11 +95,8 @@ async def update_post(session: AsyncSession, post: Post, data: PostUpdate) -> Po
     if not changes:
         return post
 
-    if "category_id" in changes:
-        category = await category_service.get_category_by_id(session, changes.pop("category_id"))
-        if category is None:
-            raise PostCategoryNotFoundError
-        post.category = category
+    if "category_ids" in changes:
+        post.categories = await _resolve_categories(session, changes.pop("category_ids"))
 
     # PostUpdate 已限制可更新字段，因此可以安全地逐项写回 ORM 对象。
     for field, value in changes.items():
@@ -110,7 +120,7 @@ async def get_post(
 
     statement = (
         select(Post)
-        .options(selectinload(Post.author), selectinload(Post.category))
+        .options(selectinload(Post.author), selectinload(Post.categories))
         .where(Post.id == post_id)
     )
     if not include_unpublished:
@@ -141,7 +151,7 @@ async def list_posts(
     仍共享一致筛选规则。它只读取数据库，不记录浏览；浏览必须在真正进入详情页时发生。
     """
 
-    statement = select(Post).options(selectinload(Post.author), selectinload(Post.category))
+    statement = select(Post).options(selectinload(Post.author), selectinload(Post.categories))
     if not include_unpublished:
         # 公开搜索、分类和首页只展示上架文章；后台通过显式可信参数读取全部。
         statement = statement.where(Post.is_published.is_(True))
@@ -159,8 +169,8 @@ async def list_posts(
 
     category_slug = params.category.strip() if params.category is not None else None
     if category_slug:
-        # 分类名称可能调整，页面 URL 使用稳定 slug；EXISTS 过滤不会改变 Post 查询的列结构。
-        statement = statement.where(Post.category.has(Category.slug == category_slug))
+        # 一个帖子命中任一关联分类即可；any() 生成 EXISTS，不会因 JOIN 产生重复帖子。
+        statement = statement.where(Post.categories.any(Category.slug == category_slug))
 
     # created_at 相同时再按 id 排序，保证分页结果顺序稳定。
     statement = (

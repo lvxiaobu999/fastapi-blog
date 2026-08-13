@@ -76,7 +76,8 @@ $(function () {
                 const title = document.createElement("td");
                 const link = document.createElement("a"); link.href = `/posts/${post.id}`; link.textContent = post.title;
                 title.append(link);
-                const category = document.createElement("td"); category.textContent = post.category.name;
+                const category = document.createElement("td");
+                category.textContent = post.categories.map((item) => item.name).join("、");
                 const author = document.createElement("td"); author.textContent = post.author.nickname;
                 const status = document.createElement("td");
                 const badge = document.createElement("span");

@@ -35,18 +35,19 @@
                        value="">
                 <div class="form-text">1～100 个字符。</div>
             </div>
-            <div>
-                <label class="form-label" for="category_id">分类</label>
-                <select class="form-select" id="category_id" name="category_id" required>
-                    <option value="" disabled selected>请选择文章分类</option>
+            <fieldset class="post-category-picker">
+                <legend class="form-label">分类</legend>
+                <div class="post-category-options">
                     {% for category in categories %}
-                    <option value="{{ category.id }}">
-                        {{ category.name }}
-                    </option>
+                    <label class="post-category-option">
+                        <input class="form-check-input" type="checkbox" name="category_ids"
+                               value="{{ category.id }}">
+                        <span>{{ category.name }}</span>
+                    </label>
                     {% endfor %}
-                </select>
-                <div class="form-text">分类会显示在首页，并用于筛选对应文章。</div>
-            </div>
+                </div>
+                <div class="form-text">至少选择一个分类；帖子可以同时出现在多个分类筛选结果中。</div>
+            </fieldset>
             <div>
                 <label class="form-label" for="summary">摘要</label>
                 <textarea class="form-control" id="summary" name="summary" rows="3" maxlength="300"

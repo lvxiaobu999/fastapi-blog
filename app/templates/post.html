@@ -22,6 +22,11 @@
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="3"/></svg>
                         <span data-view-count>{{ post.view_count }}</span> 次浏览
                     </span>
+                    {% for category in post.categories %}
+                    <a class="post-category" href="{{ url_for('posts') }}?category={{ category.slug | urlencode }}">
+                        {{ category.name }}
+                    </a>
+                    {% endfor %}
                 </div>
                 <h1>{{ post.title }}</h1>
                 {% if post.cover_image_url %}<img class="post-detail-cover" src="{{ post.cover_image_url }}" alt="{{ post.title }}横图">{% endif %}

@@ -258,7 +258,7 @@ async def test_create_post_requires_valid_admin_token(
     payload = {
         "title": "JWT protected",
         "content": "Only administrators publish.",
-        "category_id": seeded_categories["fastapi"],
+        "category_ids": [seeded_categories["fastapi"]],
     }
 
     missing = await client.post("/api/posts", json=payload)

@@ -29,7 +29,7 @@ async def seeded_posts(
                     title="Learning FastAPI",
                     content="Web framework",
                     user_id=author.id,
-                    category_id=seeded_categories["fastapi"],
+                    category_ids=[seeded_categories["fastapi"], seeded_categories["python"]],
                 ),
             ),
             await create_post(
@@ -38,7 +38,7 @@ async def seeded_posts(
                     title="SQLAlchemy",
                     content="Database mapping",
                     user_id=author.id,
-                    category_id=seeded_categories["python"],
+                    category_ids=[seeded_categories["python"]],
                 ),
             ),
             await create_post(
@@ -47,7 +47,7 @@ async def seeded_posts(
                     title="Python basics",
                     content="Language notes",
                     user_id=author.id,
-                    category_id=seeded_categories["python"],
+                    category_ids=[seeded_categories["python"]],
                 ),
             ),
         ]
@@ -57,6 +57,7 @@ async def seeded_posts(
 async def test_list_posts_with_keyword_and_author(
     client: AsyncClient,
     seeded_posts: list[int],
+    seeded_categories: dict[str, int],
 ) -> None:
     response = await client.get("/api/posts", params={"keyword": "fastapi"})
 
@@ -64,7 +65,14 @@ async def test_list_posts_with_keyword_and_author(
     body = response.json()["data"]
     assert [post["id"] for post in body] == [seeded_posts[0]]
     assert body[0]["author"]["username"] == "author"
-    assert body[0]["category"]["slug"] == "fastapi"
+    assert body[0]["category_ids"] == [
+        seeded_categories["fastapi"],
+        seeded_categories["python"],
+    ]
+    assert [category["slug"] for category in body[0]["categories"]] == [
+        "fastapi",
+        "python",
+    ]
 
 
 async def test_list_posts_filters_category(
@@ -74,7 +82,8 @@ async def test_list_posts_filters_category(
     response = await client.get("/api/posts", params={"category": "python"})
 
     assert response.status_code == 200
-    assert [post["id"] for post in response.json()["data"]] == list(reversed(seeded_posts[1:]))
+    # 第一篇帖子同时属于 FastAPI 和 Python，因此两个分类筛选都会命中它。
+    assert [post["id"] for post in response.json()["data"]] == list(reversed(seeded_posts))
 
 
 async def test_search_endpoint_returns_title_only(
@@ -147,7 +156,7 @@ async def test_admin_can_list_and_toggle_unpublished_post(
                 summary="Not public yet",
                 cover_image_url="/media/post_images/draft.png",
                 content="Draft body",
-                category_id=seeded_categories["fastapi"],
+                category_ids=[seeded_categories["fastapi"]],
                 user_id=admin.id,
                 is_published=False,
             ),
@@ -200,9 +209,89 @@ async def test_post_rejects_external_cover_url(
         json={
             "title": "Unsafe cover",
             "content": "Body",
-            "category_id": seeded_categories["fastapi"],
+            "category_ids": [seeded_categories["fastapi"]],
             "cover_image_url": "https://tracker.example/cover.png",
         },
+    )
+
+    assert response.status_code == 422
+
+
+async def test_admin_can_create_and_replace_multiple_categories(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seeded_categories: dict[str, int],
+) -> None:
+    """创建响应返回全部分类，PATCH 可以用新的非空集合整体替换。"""
+
+    async with session_factory() as session:
+        admin = User(
+            username="multi_category_admin",
+            email="multi_category_admin@example.com",
+            hashed_password="hash",
+            is_admin=True,
+        )
+        session.add(admin)
+        await session.commit()
+        await session.refresh(admin)
+        admin_id = admin.id
+
+    headers = {"Authorization": f"Bearer {create_access_token(admin_id)}"}
+    created = await client.post(
+        "/api/posts",
+        headers=headers,
+        json={
+            "title": "Multiple categories",
+            "content": "Body",
+            "category_ids": [
+                seeded_categories["fastapi"],
+                seeded_categories["python"],
+                seeded_categories["fastapi"],
+            ],
+        },
+    )
+
+    assert created.status_code == 201
+    created_post = created.json()["data"]
+    assert created_post["category_ids"] == [
+        seeded_categories["fastapi"],
+        seeded_categories["python"],
+    ]
+
+    updated = await client.patch(
+        f"/api/posts/{created_post['id']}",
+        headers=headers,
+        json={"category_ids": [seeded_categories["other"]]},
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["data"]["category_ids"] == [seeded_categories["other"]]
+
+
+@pytest.mark.parametrize("category_ids", [[], None])
+async def test_post_rejects_empty_categories(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    category_ids: list[int] | None,
+) -> None:
+    """公开写入契约要求文章至少属于一个分类。"""
+
+    async with session_factory() as session:
+        admin = User(
+            username=f"empty_categories_{category_ids is None}",
+            email=f"empty_categories_{category_ids is None}@example.com",
+            hashed_password="hash",
+            is_admin=True,
+        )
+        session.add(admin)
+        await session.commit()
+        await session.refresh(admin)
+        admin_id = admin.id
+
+    response = await client.post(
+        "/api/posts",
+        headers={"Authorization": f"Bearer {create_access_token(admin_id)}"},
+        json={"title": "No categories", "content": "Body", "category_ids": category_ids},
     )
 
     assert response.status_code == 422

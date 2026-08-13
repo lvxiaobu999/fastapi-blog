@@ -69,7 +69,7 @@ async def comment_post(
                 title="Commentable post",
                 content="Body",
                 user_id=author.id,
-                category_id=seeded_categories["fastapi"],
+                category_ids=[seeded_categories["fastapi"]],
             ),
         )
         return post.id, reader.id

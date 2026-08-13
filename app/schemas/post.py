@@ -1,9 +1,18 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.category import CategoryResponse
 from app.schemas.user import UserPublic
+
+CategoryId = Annotated[int, Field(gt=0)]
+
+
+def _unique_category_ids(values: list[int]) -> list[int]:
+    """按提交顺序去重，避免关联表联合主键收到重复关系。"""
+
+    return list(dict.fromkeys(values))
 
 
 class PostBase(BaseModel):
@@ -31,14 +40,34 @@ class PostCreate(PostBase):
     """Service 内部创建帖子时使用的完整数据。"""
 
     user_id: int
-    # 旧 Service 调用未传分类时落到“其它”；HTTP 创建请求仍要求明确选择分类。
-    category_id: int | None = Field(default=None, gt=0)
+    category_ids: list[CategoryId] | None = None
+    # 仅兼容仓库内尚未迁移的可信调用；公开 HTTP 契约只接受 category_ids。
+    category_id: CategoryId | None = Field(default=None, exclude=True)
+
+    @model_validator(mode="after")
+    def validate_category_input(self) -> "PostCreate":
+        """拒绝同时使用新旧分类参数，并对多分类 ID 去重。"""
+
+        if self.category_ids is not None and self.category_id is not None:
+            raise ValueError("category_ids and category_id cannot be used together")
+        if self.category_ids is not None:
+            if not self.category_ids:
+                raise ValueError("at least one category is required")
+            self.category_ids = _unique_category_ids(self.category_ids)
+        return self
 
 
 class PostCreateRequest(PostBase):
     """发帖 HTTP 请求；作者必须从 JWT 获取，客户端不能指定 user_id。"""
 
-    category_id: int = Field(gt=0)
+    category_ids: list[CategoryId] = Field(min_length=1)
+
+    @field_validator("category_ids")
+    @classmethod
+    def categories_must_be_unique(cls, value: list[int]) -> list[int]:
+        """接受重复选择但只保留一次，保持请求幂等且避免数据库唯一约束错误。"""
+
+        return _unique_category_ids(value)
 
 
 class PostUpdate(BaseModel):
@@ -48,7 +77,7 @@ class PostUpdate(BaseModel):
     summary: str | None = Field(default=None, max_length=300)
     cover_image_url: str | None = Field(default=None, max_length=500)
     content: str | None = Field(default=None, min_length=1)
-    category_id: int | None = Field(default=None, gt=0)
+    category_ids: list[CategoryId] | None = None
     is_published: bool | None = None
 
     @field_validator("cover_image_url")
@@ -62,14 +91,14 @@ class PostUpdate(BaseModel):
             raise ValueError("cover_image_url must be an uploaded post image")
         return value
 
-    @field_validator("category_id")
+    @field_validator("category_ids")
     @classmethod
-    def category_cannot_be_null(cls, value: int | None) -> int | None:
-        """PATCH 允许省略分类，但不允许把已有帖子的分类显式清空。"""
+    def categories_cannot_be_empty(cls, value: list[int] | None) -> list[int]:
+        """PATCH 允许省略分类，但显式提交时必须至少保留一个分类。"""
 
-        if value is None:
-            raise ValueError("category_id cannot be null")
-        return value
+        if not value:
+            raise ValueError("at least one category is required")
+        return _unique_category_ids(value)
 
 
 class PostQueryParams(BaseModel):
@@ -106,8 +135,8 @@ class PostResponse(PostBase):
     created_at: datetime
     user_id: int
     author: UserPublic
-    category_id: int
-    category: CategoryResponse
+    category_ids: list[int] = Field(min_length=1)
+    categories: list[CategoryResponse] = Field(min_length=1)
     view_count: int = Field(ge=0)
 
 

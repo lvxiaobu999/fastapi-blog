@@ -261,6 +261,18 @@ html[data-auth-state="user"][data-admin-state="true"] [data-auth-admin] {
     font-size: .78rem;
     font-weight: 650;
 }
+.post-category-picker { min-width: 0; margin: 0; padding: 0; border: 0; }
+.post-category-picker legend { float: none; width: auto; margin-bottom: 8px; font-size: 1rem; }
+.post-category-options { display: flex; flex-wrap: wrap; gap: 9px; }
+.post-category-option {
+    display: inline-flex; min-height: 40px; padding: 8px 12px; align-items: center; gap: 8px;
+    border: 1px solid var(--panel-border); border-radius: 6px; background: var(--panel-bg); cursor: pointer;
+}
+.post-category-option:has(input:checked) {
+    color: var(--link-color); border-color: var(--link-color);
+    background: color-mix(in srgb, var(--link-color) 7%, var(--panel-bg));
+}
+.post-category-option:focus-within { box-shadow: 0 0 0 3px var(--focus-ring); }
 .form-control, .form-select { min-height: 42px; border-color: var(--panel-border); border-radius: 6px; background-color: var(--panel-bg); }
 .form-control:focus, .form-select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3px var(--focus-ring); }
 .btn { border-radius: 6px; font-weight: 650; }

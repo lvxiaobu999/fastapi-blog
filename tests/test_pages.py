@@ -26,7 +26,7 @@ async def seeded_ids(
                 title="FastAPI page",
                 content="Page body",
                 user_id=user.id,
-                category_id=seeded_categories["fastapi"],
+                category_ids=[seeded_categories["fastapi"], seeded_categories["python"]],
             ),
         )
         return user.id, post.id
@@ -79,7 +79,8 @@ async def test_home_lists_categories_and_filters_posts(
     assert "Python" in all_posts.text
     assert f"/posts/{post_id}" in fastapi_posts.text
     assert "FastAPI文章" in fastapi_posts.text
-    assert f"/posts/{post_id}" not in python_posts.text
+    # 同一篇帖子同时属于 FastAPI 和 Python，两个分类页都应展示它。
+    assert f"/posts/{post_id}" in python_posts.text
 
 
 async def test_page_router_returns_html_404(client: AsyncClient) -> None:
@@ -224,7 +225,8 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert highlight_bundle_path in editor.text
     assert 'id="post-editor"' in editor.text
     assert "data-editor-feedback" in editor.text
-    assert 'name="category_id"' in editor.text
+    assert 'name="category_ids"' in editor.text
+    assert editor.text.count('name="category_ids"') == 3
     assert "data-post-preview" in editor.text
     assert "editor-preview-button" in editor.text
     assert "btn-outline-primary" not in editor.text
@@ -243,6 +245,8 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert "data-post-interactions" in viewer.text
     assert "data-view-count" in viewer.text
     assert "post-view-stat" in viewer.text
+    assert "FastAPI" in viewer.text
+    assert "Python" in viewer.text
     assert "post-view-stat" in (await client.get("/posts")).text
     assert "/static/js/post-activities.js" in viewer.text
 
