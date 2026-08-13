@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-3.2.2.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.1.0.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.0.0.min.css') }}">
 {% endblock head %}
 {% block content %}
 <div class="row justify-content-center">
@@ -67,7 +67,7 @@
 </div>
 {% endblock content %}
 {% block scripts %}
-<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-3.2.2.js') }}"></script>
-<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.1.0.js') }}"></script>
+<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-all-3.2.2.min.js') }}"></script>
+<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-all-3.0.0.min.js') }}"></script>
 <script type="module" src="{{ url_for('static', path='js/comments.js') }}"></script>
 {% endblock scripts %}

@@ -115,7 +115,11 @@ $(function () {
         }
         document.querySelector("[data-admin-identity]").textContent = user.nickname;
         document.querySelector("[data-admin-avatar]").src = user.image_path;
-        accessState.hidden = true; content.hidden = false; initializePage();
+        accessState.hidden = true;
+        content.hidden = false;
+        initializePage();
+        // 发布页最初隐藏正文，等权限确认后再通知富文本编辑器计算可见容器的尺寸。
+        document.dispatchEvent(new CustomEvent("blog:admin-ready"));
     }).fail(() => {
         // ajaxRequest 遇到 401 时已经清理失效 Token，并通过 blog:auth-required
         // 通知 auth.js 打开登录模态框。后台这里只隐藏受保护内容，避免再显示一套

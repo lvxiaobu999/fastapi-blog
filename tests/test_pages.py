@@ -215,8 +215,15 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     editor = await client.get("/posts/new")
     viewer = await client.get(f"/posts/{post_id}")
 
-    assert "/static/vendor/toastui/toastui-editor-3.2.2.js" in editor.text
+    editor_bundle_path = "/static/vendor/toastui/toastui-editor-all-3.2.2.min.js"
+    highlight_bundle_path = (
+        "/static/vendor/toastui/"
+        "toastui-editor-plugin-code-syntax-highlight-all-3.0.0.min.js"
+    )
+    assert editor_bundle_path in editor.text
+    assert highlight_bundle_path in editor.text
     assert 'id="post-editor"' in editor.text
+    assert "data-editor-feedback" in editor.text
     assert 'name="category_id"' in editor.text
     assert "data-post-preview" in editor.text
     assert "editor-preview-button" in editor.text
@@ -227,7 +234,8 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert 'id="post-preview-viewer"' in editor.text
     assert "/static/js/admin.js" in editor.text
     assert "/static/js/posts.js" in editor.text
-    assert "/static/vendor/toastui/toastui-editor-3.2.2.js" in viewer.text
+    assert editor_bundle_path in viewer.text
+    assert highlight_bundle_path in viewer.text
     assert "uicdn.toast.com" not in editor.text
     assert "uicdn.toast.com" not in viewer.text
     assert 'id="post-viewer"' in viewer.text
@@ -237,3 +245,23 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert "post-view-stat" in viewer.text
     assert "post-view-stat" in (await client.get("/posts")).text
     assert "/static/js/post-activities.js" in viewer.text
+
+    # all 构建已经打包 ProseMirror；普通构建会在浏览器中继续 require 外部模块并初始化失败。
+    editor_bundle = await client.get(editor_bundle_path)
+    highlight_bundle = await client.get(highlight_bundle_path)
+    posts_script = await client.get("/static/js/posts.js")
+    admin_script = await client.get("/static/js/admin.js")
+    site_styles = await client.get("/static/css/site.css")
+    assert editor_bundle.status_code == 200
+    assert 'require("prosemirror-' not in editor_bundle.text
+    assert highlight_bundle.status_code == 200
+    assert "Editor.plugin.codeSyntaxHighlight" in highlight_bundle.text
+    assert "showEditorFallback" in posts_script.text
+    assert "blog:admin-ready" in posts_script.text
+    assert "blog:admin-ready" in admin_script.text
+    # 详情页与发布预览共用同一横幅约束：保持 16:9，并限制大屏最大高度。
+    assert site_styles.status_code == 200
+    assert "max-width: 746px" in site_styles.text
+    assert "max-height: 420px" in site_styles.text
+    assert "aspect-ratio: 16 / 9" in site_styles.text
+    assert "object-fit: cover" in site_styles.text

@@ -2,7 +2,7 @@
 {% block page_id %}posts{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-3.2.2.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.1.0.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.0.0.min.css') }}">
 {% endblock head %}
 {% block content %}
 {% set editing_post_id = post_id | default(none) %}
@@ -78,6 +78,8 @@
                 <label class="form-label" for="content">正文</label>
                 <div id="post-editor" class="post-editor"></div>
                 <textarea class="d-none" id="content" name="content"></textarea>
+                <div class="alert alert-warning d-none mt-2" role="status"
+                     data-editor-feedback></div>
             </div>
             <div class="form-actions editor-actions">
                 <a class="btn btn-outline-secondary" href="{{ url_for('admin_posts') }}">取消</a>
@@ -126,7 +128,7 @@
 </div>
 {% endblock content %}
 {% block scripts %}
-<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-3.2.2.js') }}"></script>
-<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.1.0.js') }}"></script>
+<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-all-3.2.2.min.js') }}"></script>
+<script src="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-all-3.0.0.min.js') }}"></script>
 <script type="module" src="{{ url_for('static', path='js/posts.js') }}"></script>
 {% endblock scripts %}

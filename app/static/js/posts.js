@@ -65,6 +65,8 @@ $(function () {
     }
 
     let editor = null;
+    let editorInitializationStarted = false;
+    let editorInitializationFailed = false;
     let previewViewer = null;
     let postLoaded = true;
     const postForm = document.querySelector("[data-post-form]");
@@ -107,30 +109,95 @@ $(function () {
         coverInput.value = "";
         coverFeedback.textContent = "横图将在保存文章后移除。";
     });
-    // ---------- 编辑页：创建 Toast UI Editor，并把图片交给后端上传 ----------
+    // ---------- 编辑页：在管理员内容可见后创建 Editor，并把图片交给后端上传 ----------
     const editorElement = document.querySelector("#post-editor");
-    if (editorElement && window.toastui?.Editor) {
-        const source = document.querySelector("#content");
-        const codeSyntaxHighlight = window.toastui.Editor.plugin?.codeSyntaxHighlight;
-        editor = new window.toastui.Editor({
-            el: editorElement,
-            height: "520px",
-            initialEditType: "wysiwyg",
-            // 桌面端并排查看 Markdown 与效果；窄屏使用标签切换，避免两个面板撑破容器。
-            previewStyle: window.matchMedia("(max-width: 767.98px)").matches
-                ? "tab"
-                : "vertical",
-            initialValue: source.value,
-            plugins: codeSyntaxHighlight ? [codeSyntaxHighlight] : [],
-            hooks: {
-                addImageBlobHook(blob, callback) {
-                    // 上传成功后 callback 把服务端 URL 插回 Markdown；失败不插入占位图。
-                    uploadFile("/api/posts/images", "image", blob)
-                        .done((result) => callback(result.url, blob.name || "文章图片"))
-                        .fail((xhr) => window.alert(errorMessages(xhr)));
+    const editorSource = document.querySelector("#content");
+    const editorFeedback = document.querySelector("[data-editor-feedback]");
+
+    function showEditorFallback() {
+        if (!editorElement || !editorSource || editorInitializationFailed) {
+            return;
+        }
+        editorInitializationFailed = true;
+        editorElement.replaceChildren();
+        editorElement.classList.add("d-none");
+        editorSource.classList.remove("d-none");
+        editorSource.classList.add("form-control", "post-editor-fallback");
+        editorSource.rows = 18;
+        editorSource.required = true;
+        if (editorFeedback) {
+            editorFeedback.textContent = "富文本编辑器加载失败，已切换为普通文本框，文章仍可正常保存。";
+            editorFeedback.classList.remove("d-none");
+        }
+    }
+
+    function initializeEditor() {
+        if (editor) {
+            return "ready";
+        }
+        if (editorInitializationFailed) {
+            return "failed";
+        }
+        if (!window.toastui?.Editor) {
+            return "waiting";
+        }
+
+        try {
+            const codeSyntaxHighlight = window.toastui.Editor.plugin?.codeSyntaxHighlight;
+            editor = new window.toastui.Editor({
+                el: editorElement,
+                height: "520px",
+                initialEditType: "wysiwyg",
+                // 桌面端并排查看 Markdown 与效果；窄屏使用标签切换，避免两个面板撑破容器。
+                previewStyle: window.matchMedia("(max-width: 767.98px)").matches
+                    ? "tab"
+                    : "vertical",
+                initialValue: editorSource.value,
+                plugins: codeSyntaxHighlight ? [codeSyntaxHighlight] : [],
+                hooks: {
+                    addImageBlobHook(blob, callback) {
+                        // 上传成功后 callback 把服务端 URL 插回 Markdown；失败不插入占位图。
+                        uploadFile("/api/posts/images", "image", blob)
+                            .done((result) => callback(result.url, blob.name || "文章图片"))
+                            .fail((xhr) => window.alert(errorMessages(xhr)));
+                    },
                 },
-            },
-        });
+            });
+            return "ready";
+        } catch (error) {
+            // 第三方构建损坏时不能只留下空白区域；记录错误并保留普通文本编辑能力。
+            console.error("Toast UI Editor 初始化失败。", error);
+            showEditorFallback();
+            return "failed";
+        }
+    }
+
+    function startEditorInitialization() {
+        if (!editorElement || !editorSource || editorInitializationStarted) {
+            return;
+        }
+        const adminContent = editorElement.closest("[data-admin-content]");
+        if (adminContent?.hidden) {
+            return;
+        }
+        editorInitializationStarted = true;
+
+        if (initializeEditor() !== "waiting") {
+            return;
+        }
+        // 普通 script 与 module script 在缓存状态不同的浏览器中可能出现短暂时序差异。
+        window.setTimeout(initializeEditor, 100);
+        window.setTimeout(() => {
+            if (initializeEditor() === "waiting") {
+                showEditorFallback();
+            }
+        }, 800);
+    }
+
+    if (editorElement) {
+        // admin.js 校验管理员后才显示 main；隐藏时初始化会让编辑器错误计算宽高。
+        document.addEventListener("blog:admin-ready", startEditorInitialization, {once: true});
+        startEditorInitialization();
     }
 
     if (editingPostId) {
@@ -145,7 +212,7 @@ $(function () {
                 postForm.elements.category_id.value = String(post.category_id);
                 postForm.elements.summary.value = post.summary || "";
                 postForm.elements.is_published.checked = post.is_published;
-                document.querySelector("#content").value = post.content;
+                editorSource.value = post.content;
                 editor?.setMarkdown(post.content);
                 showCover(post.cover_image_url || "");
                 postLoaded = true;
