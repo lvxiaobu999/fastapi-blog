@@ -6,7 +6,12 @@ from pydantic import SecretStr, ValidationError
 from app.core.config import Settings
 
 
-def production_settings(*, auth_cookie_secure: bool) -> Settings:
+def production_settings(
+    *,
+    auth_cookie_secure: bool,
+    public_ip_mode: bool = False,
+    allowed_hosts: list[str] | None = None,
+) -> Settings:
     """构造最小生产配置，供安全组合测试复用。"""
 
     return Settings(
@@ -14,8 +19,9 @@ def production_settings(*, auth_cookie_secure: bool) -> Settings:
         database_url="postgresql+psycopg://app:placeholder@db.internal/blog",
         secret_key=SecretStr("test-only-secret-with-at-least-32-characters"),
         redis_url=SecretStr("rediss://cache.internal:6379/0"),
-        allowed_hosts=["blog.example.com"],
+        allowed_hosts=allowed_hosts or ["blog.example.com"],
         auth_cookie_secure=auth_cookie_secure,
+        public_ip_mode=public_ip_mode,
         _env_file=None,
     )
 
@@ -34,6 +40,37 @@ def test_production_accepts_secure_refresh_cookie() -> None:
 
     assert settings.env == "production"
     assert settings.auth_cookie_secure is True
+
+
+def test_public_ip_mode_accepts_http_cookie_for_ipv4_host() -> None:
+    """临时公网 IP 模式允许 HTTP Cookie，但只接受明确的 IPv4 Host。"""
+
+    settings = production_settings(
+        auth_cookie_secure=False,
+        public_ip_mode=True,
+        allowed_hosts=["203.0.113.10"],
+    )
+
+    assert settings.public_ip_mode is True
+    assert settings.allowed_hosts == ["203.0.113.10"]
+
+
+def test_public_ip_mode_rejects_domain_or_secure_cookie() -> None:
+    """公网 IP 开关不能被复用于正式域名，也不能与 Secure Cookie 矛盾。"""
+
+    with pytest.raises(ValidationError, match="IPv4 addresses only"):
+        production_settings(
+            auth_cookie_secure=False,
+            public_ip_mode=True,
+            allowed_hosts=["blog.example.com"],
+        )
+
+    with pytest.raises(ValidationError, match="AUTH_COOKIE_SECURE=false"):
+        production_settings(
+            auth_cookie_secure=True,
+            public_ip_mode=True,
+            allowed_hosts=["203.0.113.10"],
+        )
 
 
 def test_production_rejects_short_secret_and_wildcard_host() -> None:

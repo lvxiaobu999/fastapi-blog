@@ -1,0 +1,66 @@
+# 备案和 TLS 证书就绪前的临时公网 IPv4 + HTTP 部署。
+# 它保留生产 PostgreSQL/Redis 和媒体持久化，但只开放 Nginx 80；不要与正式 HTTPS
+# compose.production.yaml 同时启动。域名和证书就绪后应切回正式 Compose。
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fastapi-blog:${APP_IMAGE_TAG:-local}
+    env_file:
+      - ${APP_ENV_FILE:-/opt/fastapi-blog/config/app.env}
+    expose:
+      - "8000"
+    volumes:
+      - ${MEDIA_HOST_PATH:-/opt/fastapi-blog/data/media}:/app/app/media
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      # Host 取 ALLOWED_HOSTS 的第一个 IPv4，与公网访问和 TrustedHostMiddleware 保持一致。
+      test:
+        [
+          "CMD",
+          "uv",
+          "run",
+          "python",
+          "-c",
+          "import json, os, urllib.request; host=json.loads(os.environ['ALLOWED_HOSTS'])[0]; request=urllib.request.Request('http://127.0.0.1:8000/health/ready', headers={'Host': host}); urllib.request.urlopen(request, timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:1.28-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      # 这里只接受 ECS/EIP 的公网 IPv4；Nginx 官方 entrypoint 会把它写入 server_name。
+      APP_PUBLIC_IP: ${APP_PUBLIC_IP:?请设置 ECS 或 EIP 的公网 IPv4}
+      NGINX_ENVSUBST_FILTER: ^APP_PUBLIC_IP$
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/public-ip.conf.template:/etc/nginx/templates/default.conf.template:ro
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - backend
+
+networks:
+  # FastAPI 8000 仍只在 Compose 内网暴露，公网入口保持为 Nginx 80。
+  backend:
+    driver: bridge

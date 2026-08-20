@@ -6,6 +6,7 @@
 
 import os
 from functools import lru_cache
+from ipaddress import IPv4Address, ip_address
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -19,6 +20,21 @@ COMMON_ENV_FILE = PROJECT_ROOT / ".env"
 
 Environment = Literal["development", "production"]
 LogFormat = Literal["text", "json"]
+
+
+def _parse_ip(value: str):
+    """把 Host 候选解析为 IP；域名或格式错误时返回 ``None``。"""
+
+    try:
+        return ip_address(value)
+    except ValueError:
+        return None
+
+
+def _is_ipv4(value: str) -> bool:
+    """判断 Host 是否为 IPv4 字面量。"""
+
+    return isinstance(_parse_ip(value), IPv4Address)
 
 
 def _selected_environment() -> str:
@@ -67,6 +83,10 @@ class Settings(BaseSettings):
     refresh_idle_timeout_minutes: int = Field(default=24 * 60, ge=1)
     # 本地 HTTP 调试设为 False；生产 HTTPS 必须设为 True，防止 Cookie 明文传输。
     auth_cookie_secure: bool = False
+    # 备案和证书完成前的临时公网 IP HTTP 模式。它只允许显式开启，且必须配合字面 IPv4
+    # Host 和非 Secure Cookie 使用；不要在正式域名或 HTTPS 部署中打开，否则 Refresh
+    # Token 会以明文 HTTP Cookie 传输。备案/证书完成后应删除该项或恢复为 false。
+    public_ip_mode: bool = False
     # Redis 保存有状态 Refresh Session。SecretStr 防止带密码的生产 URL 出现在配置 repr。
     redis_url: SecretStr = SecretStr("redis://localhost:6379/0")
     # Key 前缀隔离同一 Redis 数据库中的不同应用和环境；修改后旧会话会自然失效。
@@ -93,7 +113,8 @@ class Settings(BaseSettings):
         """检查单个字段类型无法表达的跨配置安全规则。
 
         例如 ``auth_cookie_secure`` 单独看只是布尔值，但与 ``env=production`` 组合时必须为
-        True。校验失败会阻止应用启动，避免带着不完整的生产配置继续运行。
+        True（临时 ``PUBLIC_IP_MODE`` 是唯一例外）。校验失败会阻止应用启动，避免带着不完整
+        的生产配置继续运行。
         """
 
         if self.env == "development" and not self.database_url.startswith("sqlite+aiosqlite://"):
@@ -102,8 +123,13 @@ class Settings(BaseSettings):
             raise ValueError("Production DATABASE_URL must use PostgreSQL with psycopg")
         # Refresh Token 保存在 Cookie 中。生产流量即使通常由 Nginx 跳转到 HTTPS，漏掉
         # Secure 仍可能让浏览器在跳转前的 HTTP 请求中携带 Cookie，因此必须启动失败。
-        if self.env == "production" and not self.auth_cookie_secure:
+        if self.env == "production" and not self.auth_cookie_secure and not self.public_ip_mode:
             raise ValueError("Production AUTH_COOKIE_SECURE must be true")
+        if self.public_ip_mode:
+            if self.env != "production":
+                raise ValueError("PUBLIC_IP_MODE requires ENV=production")
+            if self.auth_cookie_secure:
+                raise ValueError("PUBLIC_IP_MODE requires AUTH_COOKIE_SECURE=false")
         normalized_hosts = [host.strip().lower() for host in self.allowed_hosts]
         if any(
             not host or host == "*" or "://" in host or "/" in host or " " in host
@@ -115,6 +141,12 @@ class Settings(BaseSettings):
         self.allowed_hosts = list(dict.fromkeys(normalized_hosts))
         if self.env == "production" and {"test", "testserver"} & set(self.allowed_hosts):
             raise ValueError("Production ALLOWED_HOSTS must be explicitly configured")
+        # 只接受 IPv4 字面量，避免把临时 HTTP 模式误用于正式域名。IPv6 还需要在 Nginx
+        # listen/server_name、浏览器 URL 和安全组层面分别处理，暂不纳入该开关。
+        if self.public_ip_mode and (
+            not self.allowed_hosts or any(not _is_ipv4(host) for host in self.allowed_hosts)
+        ):
+            raise ValueError("PUBLIC_IP_MODE ALLOWED_HOSTS must contain IPv4 addresses only")
         if self.env == "production" and len(self.secret_key.get_secret_value()) < 32:
             raise ValueError("Production SECRET_KEY must contain at least 32 characters")
         if self.refresh_idle_timeout_minutes <= self.access_token_expire_minutes:
