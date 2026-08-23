@@ -6,6 +6,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # 仅在确认 Docker DNS/出口策略后通过 --env-file 注入可选镜像地址。
+      args:
+        UV_INDEX_URL: ${UV_INDEX_URL:-}
     image: fastapi-blog:${APP_IMAGE_TAG:-local}
     env_file:
       - ${APP_ENV_FILE:-/opt/fastapi-blog/config/app.env}

@@ -1,6 +1,8 @@
 # 生产镜像固定 Python 3.13 系列，避免构建机本地环境影响容器运行结果。
 FROM python:3.13-slim
 
+ARG UV_INDEX_URL
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
@@ -13,13 +15,23 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.9 /uv /uvx /bin/
 
 # 先复制依赖清单，业务代码变化时可以继续复用依赖安装缓存。
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# UV_INDEX_URL 只作为受控构建参数：默认使用 uv 的默认索引，只有确认 ECS DNS/出口策略
+# 后才传入镜像地址。不能把某个地区镜像永久写死在运行镜像里。
+RUN if [ -n "$UV_INDEX_URL" ]; then \
+        UV_INDEX_URL="$UV_INDEX_URL" uv sync --frozen --no-dev --no-install-project; \
+    else \
+        uv sync --frozen --no-dev --no-install-project; \
+    fi
 
 # 应用运行需要模板、静态文件和默认媒体目录，迁移命令需要 migrations 与 alembic.ini。
 COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini README.md ./
-RUN uv sync --frozen --no-dev
+RUN if [ -n "$UV_INDEX_URL" ]; then \
+        UV_INDEX_URL="$UV_INDEX_URL" uv sync --frozen --no-dev; \
+    else \
+        uv sync --frozen --no-dev; \
+    fi
 
 # 应用不使用 root 运行。宿主机挂载的 media 目录需要允许 UID 10001 写入。
 RUN useradd --create-home --uid 10001 appuser \

@@ -1,10 +1,14 @@
-# 生产 Compose 只运行 FastAPI 和 Nginx。PostgreSQL 使用 RDS，Redis 使用 Tair，
+# 正式生产 Compose 只运行 FastAPI 和 Nginx。PostgreSQL 使用 RDS，Redis 使用 Tair，
 # 两者的 VPC 内网连接信息通过 APP_ENV_FILE 注入，不能写进本文件或镜像。
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      # 阿里云 ECS 若 Docker 构建网络无法解析包索引，可在受控 shell 中传入
+      # UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple；默认不固定地区镜像。
+      args:
+        UV_INDEX_URL: ${UV_INDEX_URL:-}
     # 发布时用 Git commit/tag 设置 APP_IMAGE_TAG，避免无法判断线上实际运行版本。
     image: fastapi-blog:${APP_IMAGE_TAG:-local}
     env_file:

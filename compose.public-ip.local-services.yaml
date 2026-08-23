@@ -1,0 +1,59 @@
+# 公网 IP 临时入口的本机依赖服务覆盖层。
+# 只有 PostgreSQL/Redis 确实部署在这台 ECS 时才使用；若使用 RDS/Tair，不要叠加本文件。
+# 密码通过受限的 Compose 参数文件注入，不写进 YAML、镜像或 Git。
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${LOCAL_POSTGRES_USER:?请设置本机 PostgreSQL 用户}
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:?请设置本机 PostgreSQL 密码}
+      POSTGRES_DB: ${LOCAL_POSTGRES_DB:?请设置本机 PostgreSQL 数据库}
+    volumes:
+      - ${PG_DATA_PATH:-/opt/fastapi-blog/data/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${LOCAL_REDIS_PASSWORD:?请设置本机 Redis 密码}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$${REDIS_PASSWORD}\" --appendonly yes"]
+    volumes:
+      - ${REDIS_DATA_PATH:-/opt/fastapi-blog/data/redis}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  app:
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+networks:
+  backend:
+    driver: bridge
