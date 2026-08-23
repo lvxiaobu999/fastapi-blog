@@ -54,16 +54,68 @@
                 <div>
                     <label class="form-label" for="admin-login-username">用户名或邮箱</label>
                     <input class="form-control" id="admin-login-username" name="username"
-                           autocomplete="username" required>
+                           autocomplete="username" placeholder="请输入用户名或邮箱" required>
                 </div>
                 <div>
                     <label class="form-label" for="admin-login-password">密码</label>
                     <input class="form-control" id="admin-login-password" name="password"
-                           type="password" autocomplete="current-password" required>
+                           type="password" autocomplete="current-password" placeholder="请输入登录密码" required>
                 </div>
+                <div class="form-label-row"><span></span><a href="#password-reset" data-forgot-password>忘记密码？</a></div>
                 <button class="btn btn-primary" type="submit">登录</button>
             </form>
         </div>
+    </div>
+</div>
+
+<div class="modal fade" id="passwordResetModal" tabindex="-1"
+     aria-labelledby="passwordResetModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="passwordResetModalTitle">找回密码</h2>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <form class="modal-body stacked-form" data-password-reset-form>
+                <div class="alert d-none" role="alert" data-form-feedback></div>
+                <div>
+                    <label class="form-label" for="password-reset-email">注册邮箱</label>
+                    <input class="form-control" id="password-reset-email" name="email" type="email"
+                           maxlength="254" autocomplete="email" placeholder="请输入注册邮箱" required>
+                </div>
+                <div class="form-actions">
+                    <label class="form-label mb-0" for="password-reset-code">验证码</label>
+                    <button class="btn verification-code-button" type="button" data-request-reset-code>发送验证码</button>
+                </div>
+                <input class="form-control" id="password-reset-code" name="code" inputmode="numeric"
+                       pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code"
+                       placeholder="请输入邮件中的 6 位验证码" required>
+                <div>
+                    <label class="form-label" for="password-reset-new-password">新密码</label>
+                    <input class="form-control" id="password-reset-new-password" name="new_password"
+                           type="password" minlength="8" maxlength="128" autocomplete="new-password"
+                           placeholder="请输入新密码（至少 8 个字符）" required>
+                </div>
+                <div>
+                    <label class="form-label" for="password-reset-confirm-password">确认新密码</label>
+                    <input class="form-control" id="password-reset-confirm-password" name="confirm_password"
+                           type="password" minlength="8" maxlength="128" autocomplete="new-password"
+                           placeholder="请再次输入新密码" required>
+                </div>
+                <button class="btn btn-primary" type="submit">重置密码</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container position-fixed top-0 end-0 p-3" id="appToastContainer"
+     aria-live="polite" aria-atomic="true">
+    <div id="appToast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto">三碗博客</strong>
+            <button class="btn-close" type="button" data-bs-dismiss="toast" aria-label="关闭"></button>
+        </div>
+        <div class="toast-body" data-toast-message></div>
     </div>
 </div>
 

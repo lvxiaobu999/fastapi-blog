@@ -20,6 +20,17 @@ function showFeedback($form, message, kind = "danger") {
         .text(message);
 }
 
+function showToast(message, kind = "success") {
+    // Toast 位于 modal 外部，弹窗关闭后提示仍然可见；适合注册/重置这种成功后
+    // 不应继续停留在原表单里的操作。Bootstrap Toast 负责自动隐藏和关闭动画。
+    const toastElement = document.querySelector("#appToast");
+    if (!toastElement) return;
+    toastElement.classList.remove("text-bg-success", "text-bg-danger", "text-bg-info");
+    toastElement.classList.add(`text-bg-${kind}`);
+    toastElement.querySelector("[data-toast-message]").textContent = message;
+    bootstrap.Toast.getOrCreateInstance(toastElement, {delay: 2800}).show();
+}
+
 function openLoginModal(message) {
     // layout 页面有模态框，独立登录页面只有普通表单，因此依次尝试两种容器。
     const form = document.querySelector("#loginModal [data-login-form]")
@@ -136,17 +147,10 @@ $(function () {
                 confirm_password: $form.find("[name=confirm_password]").val(),
             },
         }).done(() => {
-            showFeedback($form, "密码重置成功，请使用新密码登录。", "success");
+            showToast("密码重置成功，请使用新密码登录。", "success");
             $form[0].reset();
-            window.setTimeout(() => {
-                bootstrap.Modal.getOrCreateInstance(document.querySelector("#passwordResetModal")).hide();
-                const loginForm = document.querySelector("#loginModal [data-login-form]");
-                if (loginForm) {
-                    $(loginForm).find("[name=username]").val(resetEmail);
-                    showFeedback($(loginForm), "密码重置成功，请登录。", "success");
-                    bootstrap.Modal.getOrCreateInstance(document.querySelector("#loginModal")).show();
-                }
-            }, 700);
+            const resetModal = document.querySelector("#passwordResetModal");
+            if (resetModal) bootstrap.Modal.getOrCreateInstance(resetModal).hide();
         }).fail((xhr) => showFeedback($form, errorMessages(xhr)))
             .always(() => setButtonLoading(button, false));
     });
@@ -171,8 +175,10 @@ $(function () {
                 password,
             },
         }).done(() => {
-            showFeedback($form, "注册成功，请使用新账号登录。", "success");
+            showToast("注册成功，请使用新账号登录。", "success");
             $form[0].reset();
+            const registerModal = $form.closest(".modal")[0];
+            if (registerModal) bootstrap.Modal.getOrCreateInstance(registerModal).hide();
         }).fail((xhr) => showFeedback($form, errorMessages(xhr)))
             .always(() => setButtonLoading(button, false));
     });

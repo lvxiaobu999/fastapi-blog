@@ -14,8 +14,11 @@ export function setButtonLoading(button, loading, loadingText = "处理中…") 
         if (button.dataset.loading === "true") return false;
         button.dataset.loading = "true";
         button.dataset.idleHtml = button.innerHTML;
-        // 切换成较短或较长的 loading 文案时固定当前宽度，避免周围布局跳动。
-        button.style.width = `${button.getBoundingClientRect().width}px`;
+        button.dataset.idleAriaLabel = button.getAttribute("aria-label") ?? "";
+        // 先记录 border-box 宽度，再让 loading 内容绝对定位。这样 spinner 和文案
+        // 不会参与按钮的正常排版，也不会把“发送验证码”按钮横向撑大。
+        button.style.width = `${Math.ceil(button.getBoundingClientRect().width)}px`;
+        button.classList.add("button-is-loading");
         button.disabled = true;
 
         const spinner = document.createElement("span");
@@ -23,7 +26,11 @@ export function setButtonLoading(button, loading, loadingText = "处理中…") 
         spinner.setAttribute("aria-hidden", "true");
         const label = document.createElement("span");
         label.textContent = loadingText;
-        button.replaceChildren(spinner, label);
+        const loadingContent = document.createElement("span");
+        loadingContent.className = "button-loading-content";
+        loadingContent.append(spinner, label);
+        button.replaceChildren(loadingContent);
+        button.setAttribute("aria-label", loadingText);
         button.setAttribute("aria-busy", "true");
         return true;
     }
@@ -33,8 +40,15 @@ export function setButtonLoading(button, loading, loadingText = "处理中…") 
     button.innerHTML = button.dataset.idleHtml;
     button.disabled = false;
     button.style.width = "";
+    button.classList.remove("button-is-loading");
+    if (button.dataset.idleAriaLabel) {
+        button.setAttribute("aria-label", button.dataset.idleAriaLabel);
+    } else {
+        button.removeAttribute("aria-label");
+    }
     button.removeAttribute("aria-busy");
     delete button.dataset.loading;
     delete button.dataset.idleHtml;
+    delete button.dataset.idleAriaLabel;
     return true;
 }

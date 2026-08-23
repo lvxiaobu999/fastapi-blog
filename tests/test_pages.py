@@ -55,6 +55,13 @@ async def test_page_router_renders_pages(
     assert "FastAPI page" in responses[1].text
     assert "data-forgot-password" in responses[2].text
     assert "data-password-reset-form" in responses[2].text
+    assert "verification-code-button" in responses[2].text
+    assert 'placeholder="请输入登录密码"' in responses[2].text
+    assert 'placeholder="请输入用户名"' in responses[3].text
+    assert 'placeholder="请输入常用邮箱"' in responses[3].text
+    assert 'placeholder="请输入密码（至少 8 个字符）"' in responses[3].text
+    assert 'placeholder="请再次输入密码"' in responses[3].text
+    assert 'id="appToast"' in responses[2].text
     # 资料页是公开 GET，邮箱只能在 /api/auth/me 验证本人后由前端填充。
     assert "author@example.com" not in responses[7].text
     assert "data-profile-settings hidden" in responses[7].text
@@ -140,6 +147,7 @@ async def test_layout_includes_loading_and_session_scripts(client: AsyncClient) 
     api_script = await client.get("/static/js/api.js")
     ui_script = await client.get("/static/js/ui.js")
     bootstrap_state = await client.get("/static/js/bootstrap-state.js")
+    site_styles = await client.get("/static/css/site.css")
 
     assert response.status_code == 200
     assert "/static/js/auth.js" in response.text
@@ -149,6 +157,10 @@ async def test_layout_includes_loading_and_session_scripts(client: AsyncClient) 
     assert "图片上传与 JSON API 共享同一个 Refresh Promise" in api_script.text
     assert bootstrap_state.status_code == 200
     assert "dataset.authState" in bootstrap_state.text
+    assert site_styles.status_code == 200
+    assert ".form-actions { flex-wrap: nowrap; }" in site_styles.text
+    assert ".form-actions > .btn { flex: 0 0 auto; white-space: nowrap; }" in site_styles.text
+    assert ".form-actions > .verification-code-button" in site_styles.text
 
 
 async def test_layout_has_authenticated_user_menu_and_password_modal(client: AsyncClient) -> None:
@@ -169,6 +181,11 @@ async def test_layout_has_authenticated_user_menu_and_password_modal(client: Asy
     assert '/admin"' in response.text
     assert 'id="passwordModal"' in response.text
     assert "data-password-form" in response.text
+    assert 'id="modal-login-password"' in response.text
+    assert 'placeholder="请输入登录密码"' in response.text
+    assert 'placeholder="请输入注册邮箱"' in response.text
+    assert 'placeholder="请输入新密码（至少 8 个字符）"' in response.text
+    assert 'placeholder="请再次输入新密码"' in response.text
     assert "?tab=comments" in response.text
     assert "?tab=likes" in response.text
     assert "?tab=favorites" in response.text
@@ -194,6 +211,14 @@ async def test_admin_pages_use_separate_layout(client: AsyncClient) -> None:
     assert "/static/js/auth.js" in dashboard.text
     assert 'id="loginModal"' in dashboard.text
     assert "data-login-form" in dashboard.text
+    assert "data-forgot-password" in dashboard.text
+    assert 'id="passwordResetModal"' in dashboard.text
+    assert "data-password-reset-form" in dashboard.text
+    assert "verification-code-button" in dashboard.text
+    assert 'placeholder="请输入用户名或邮箱"' in dashboard.text
+    assert 'placeholder="请输入登录密码"' in dashboard.text
+    assert 'placeholder="请输入注册邮箱"' in dashboard.text
+    assert 'id="appToast"' in dashboard.text
     assert "admin-theme-toggle" in dashboard.text
     assert "/static/js/theme.js" in dashboard.text
     assert "theme-option" not in dashboard.text

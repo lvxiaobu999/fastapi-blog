@@ -161,7 +161,8 @@
                     <input class="form-control" id="modal-login-username" name="username"
                            autocomplete="username" placeholder="用户名或邮箱" required></div>
                 <div><label class="form-label" for="modal-login-password">密码</label>
-                    <input class="form-control" id="modal-login-password" name="password" type="password" autocomplete="current-password" required></div>
+                    <input class="form-control" id="modal-login-password" name="password" type="password"
+                           autocomplete="current-password" placeholder="请输入登录密码" required></div>
                 <div class="form-label-row"><span></span><a href="#password-reset" data-forgot-password>忘记密码？</a></div>
                 <button class="btn btn-primary" type="submit">登录</button>
             </form>
@@ -177,20 +178,22 @@
                 <div class="alert d-none" role="alert" data-form-feedback></div>
                 <div><label class="form-label" for="password-reset-email">注册邮箱</label>
                     <input class="form-control" id="password-reset-email" name="email" type="email"
-                           maxlength="254" autocomplete="email" required></div>
+                           maxlength="254" autocomplete="email" placeholder="请输入注册邮箱" required></div>
                 <div class="form-actions">
                     <label class="form-label mb-0" for="password-reset-code">验证码</label>
-                    <button class="btn btn-outline-secondary" type="button" data-request-reset-code>发送验证码</button>
+                    <button class="btn verification-code-button" type="button" data-request-reset-code>发送验证码</button>
                 </div>
                 <input class="form-control" id="password-reset-code" name="code" inputmode="numeric"
                        pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code"
                        placeholder="请输入邮件中的 6 位验证码" required>
                 <div><label class="form-label" for="password-reset-new-password">新密码</label>
                     <input class="form-control" id="password-reset-new-password" name="new_password"
-                           type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
+                           type="password" minlength="8" maxlength="128" autocomplete="new-password"
+                           placeholder="请输入新密码（至少 8 个字符）" required></div>
                 <div><label class="form-label" for="password-reset-confirm-password">确认新密码</label>
                     <input class="form-control" id="password-reset-confirm-password" name="confirm_password"
-                           type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
+                           type="password" minlength="8" maxlength="128" autocomplete="new-password"
+                           placeholder="请再次输入新密码" required></div>
                 <button class="btn btn-primary" type="submit">重置密码</button>
             </form>
         </div></div>
@@ -203,13 +206,19 @@
             <form class="modal-body stacked-form" data-register-form>
                 <div class="alert d-none" role="alert" data-form-feedback></div>
                 <div><label class="form-label" for="modal-register-username">用户名</label>
-                    <input class="form-control" id="modal-register-username" name="username" maxlength="50" required></div>
+                    <input class="form-control" id="modal-register-username" name="username" maxlength="50"
+                           autocomplete="username" placeholder="请输入用户名" required></div>
                 <div><label class="form-label" for="modal-register-email">邮箱</label>
-                    <input class="form-control" id="modal-register-email" name="email" type="email" maxlength="254" required></div>
+                    <input class="form-control" id="modal-register-email" name="email" type="email" maxlength="254"
+                           autocomplete="email" placeholder="请输入常用邮箱" required></div>
                 <div><label class="form-label" for="modal-register-password">密码</label>
-                    <input class="form-control" id="modal-register-password" name="password" type="password" minlength="8" maxlength="128" required></div>
+                    <input class="form-control" id="modal-register-password" name="password" type="password"
+                           minlength="8" maxlength="128" autocomplete="new-password"
+                           placeholder="请输入密码（至少 8 个字符）" required></div>
                 <div><label class="form-label" for="modal-register-confirm">确认密码</label>
-                    <input class="form-control" id="modal-register-confirm" name="password_confirm" type="password" minlength="8" maxlength="128" required></div>
+                    <input class="form-control" id="modal-register-confirm" name="password_confirm" type="password"
+                           minlength="8" maxlength="128" autocomplete="new-password"
+                           placeholder="请再次输入密码" required></div>
                 <button class="btn btn-primary" type="submit">注册账号</button>
             </form>
         </div></div>
@@ -223,16 +232,29 @@
                 <div class="alert d-none" role="alert" data-form-feedback></div>
                 <div><label class="form-label" for="current-password">当前密码</label>
                     <input class="form-control" id="current-password" name="current_password"
-                           type="password" autocomplete="current-password" required></div>
+                           type="password" autocomplete="current-password" placeholder="请输入当前密码" required></div>
                 <div><label class="form-label" for="new-password">新密码</label>
                     <input class="form-control" id="new-password" name="new_password" type="password"
-                           minlength="8" maxlength="128" autocomplete="new-password" required></div>
+                           minlength="8" maxlength="128" autocomplete="new-password"
+                           placeholder="请输入新密码（至少 8 个字符）" required></div>
                 <div><label class="form-label" for="confirm-password">确认新密码</label>
                     <input class="form-control" id="confirm-password" name="confirm_password" type="password"
-                           minlength="8" maxlength="128" autocomplete="new-password" required></div>
+                           minlength="8" maxlength="128" autocomplete="new-password"
+                           placeholder="请再次输入新密码" required></div>
                 <button class="btn btn-primary" type="submit">确认修改</button>
             </form>
         </div></div>
+    </div>
+
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="appToastContainer"
+         aria-live="polite" aria-atomic="true">
+        <div id="appToast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto" data-toast-title>三碗博客</strong>
+                <button class="btn-close" type="button" data-bs-dismiss="toast" aria-label="关闭"></button>
+            </div>
+            <div class="toast-body" data-toast-message></div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', path='js/jquery-4.0.0.min.js') }}"></script>

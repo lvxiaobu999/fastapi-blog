@@ -39,7 +39,7 @@ def _send_sync(
     """在工作线程中建立 SMTP 连接并发送邮件。"""
 
     message = EmailMessage()
-    message["Subject"] = "【FastAPI Blog】密码重置验证码"
+    message["Subject"] = f"【{title}】密码重置验证码"
     message["From"] = formataddr((from_name, from_email))
     message["To"] = recipient
     message.set_content(
