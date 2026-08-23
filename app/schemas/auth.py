@@ -1,6 +1,6 @@
 """JWT 认证接口契约；只描述登录响应，不暴露 Token 内部或用户敏感字段。"""
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class PasswordChangeRequest(BaseModel):
@@ -12,6 +12,29 @@ class PasswordChangeRequest(BaseModel):
 
     @model_validator(mode="after")
     def passwords_match(self) -> "PasswordChangeRequest":
+        """在进入 Service 前拒绝两次输入不一致的新密码。"""
+
+        if self.new_password != self.confirm_password:
+            raise ValueError("New passwords do not match")
+        return self
+
+
+class PasswordResetRequest(BaseModel):
+    """请求向已注册邮箱发送一次性密码重置验证码。"""
+
+    email: EmailStr = Field(max_length=254)
+
+
+class PasswordResetConfirm(BaseModel):
+    """使用邮箱验证码提交新密码；验证码只能成功使用一次。"""
+
+    email: EmailStr = Field(max_length=254)
+    code: str = Field(pattern=r"^[0-9]{6}$")
+    new_password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "PasswordResetConfirm":
         """在进入 Service 前拒绝两次输入不一致的新密码。"""
 
         if self.new_password != self.confirm_password:

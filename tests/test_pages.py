@@ -53,6 +53,8 @@ async def test_page_router_renders_pages(
 
     assert all(response.status_code == 200 for response in responses)
     assert "FastAPI page" in responses[1].text
+    assert "data-forgot-password" in responses[2].text
+    assert "data-password-reset-form" in responses[2].text
     # 资料页是公开 GET，邮箱只能在 /api/auth/me 验证本人后由前端填充。
     assert "author@example.com" not in responses[7].text
     assert "data-profile-settings hidden" in responses[7].text
@@ -218,8 +220,7 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
 
     editor_bundle_path = "/static/vendor/toastui/toastui-editor-all-3.2.2.min.js"
     highlight_bundle_path = (
-        "/static/vendor/toastui/"
-        "toastui-editor-plugin-code-syntax-highlight-all-3.0.0.min.js"
+        "/static/vendor/toastui/toastui-editor-plugin-code-syntax-highlight-all-3.0.0.min.js"
     )
     assert editor_bundle_path in editor.text
     assert highlight_bundle_path in editor.text

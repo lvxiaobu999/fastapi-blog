@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>
         {% if title %}
-            FastAPI Blog - {{ title }}
+            三碗博客 - {{ title }}
         {% else %}
-            FastAPI Blog
+            三碗博客
         {% endif %}
     </title>
     <script src="{{ url_for('static', path='js/bootstrap-state.js') }}"></script>
@@ -20,7 +20,7 @@
         <div class="container-xl">
             <a class="navbar-brand" href="{{ url_for('home') }}">
                 <span class="brand-mark" aria-hidden="true">F</span>
-                <span>FastAPI Blog</span>
+                <span>三碗博客</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                     data-bs-target="#mainNavbar" aria-controls="mainNavbar"
@@ -114,7 +114,7 @@
 
     <footer class="site-footer">
         <div class="container-xl">
-            <span>FastAPI Blog</span>
+            <span>三碗博客</span>
             <span>记录技术，也记录思考。</span>
         </div>
     </footer>
@@ -162,7 +162,36 @@
                            autocomplete="username" placeholder="用户名或邮箱" required></div>
                 <div><label class="form-label" for="modal-login-password">密码</label>
                     <input class="form-control" id="modal-login-password" name="password" type="password" autocomplete="current-password" required></div>
+                <div class="form-label-row"><span></span><a href="#password-reset" data-forgot-password>忘记密码？</a></div>
                 <button class="btn btn-primary" type="submit">登录</button>
+            </form>
+        </div></div>
+    </div>
+
+    <div class="modal fade" id="passwordResetModal" tabindex="-1"
+         aria-labelledby="passwordResetModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <div class="modal-header"><h2 class="modal-title fs-5" id="passwordResetModalTitle">找回密码</h2>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+            <form class="modal-body stacked-form" data-password-reset-form>
+                <div class="alert d-none" role="alert" data-form-feedback></div>
+                <div><label class="form-label" for="password-reset-email">注册邮箱</label>
+                    <input class="form-control" id="password-reset-email" name="email" type="email"
+                           maxlength="254" autocomplete="email" required></div>
+                <div class="form-actions">
+                    <label class="form-label mb-0" for="password-reset-code">验证码</label>
+                    <button class="btn btn-outline-secondary" type="button" data-request-reset-code>发送验证码</button>
+                </div>
+                <input class="form-control" id="password-reset-code" name="code" inputmode="numeric"
+                       pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code"
+                       placeholder="请输入邮件中的 6 位验证码" required>
+                <div><label class="form-label" for="password-reset-new-password">新密码</label>
+                    <input class="form-control" id="password-reset-new-password" name="new_password"
+                           type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
+                <div><label class="form-label" for="password-reset-confirm-password">确认新密码</label>
+                    <input class="form-control" id="password-reset-confirm-password" name="confirm_password"
+                           type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
+                <button class="btn btn-primary" type="submit">重置密码</button>
             </form>
         </div></div>
     </div>

@@ -14,9 +14,16 @@ from app.db.session import get_db
 from app.dependencies.auth import CurrentUser
 from app.models import User
 from app.schemas.api import ApiSuccess
-from app.schemas.auth import PasswordChangeRequest, TokenResponse
+from app.schemas.auth import (
+    PasswordChangeRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    TokenResponse,
+)
 from app.schemas.user import UserResponse
 from app.services import auth as auth_service
+from app.services import email as email_service
+from app.services import password_reset as password_reset_service
 from app.services import refresh_sessions as refresh_session_service
 from app.services import users as user_service
 
@@ -149,6 +156,54 @@ async def current_session(request: Request, current_user: CurrentUser) -> ApiSuc
     """验证当前 Access Token，并返回导航会话所需的当前用户。"""
 
     return success_response(request, UserResponse.model_validate(current_user))
+
+
+@router.post("/password-reset/request", response_model=ApiSuccess[None])
+async def request_password_reset_code(
+    request: Request,
+    data: PasswordResetRequest,
+    session: DbSession,
+    redis: RedisClient,
+) -> ApiSuccess[None]:
+    """向邮箱发送一次性验证码；无论邮箱是否注册都返回相同成功消息。"""
+
+    try:
+        await password_reset_service.request_password_reset(session, redis, str(data.email))
+    except email_service.EmailDeliveryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email service temporarily unavailable",
+        ) from exc
+    return success_response(
+        request,
+        None,
+        message="If the email is registered, a verification code has been sent",
+    )
+
+
+@router.post("/password-reset/confirm", response_model=ApiSuccess[None])
+async def confirm_password_reset(
+    request: Request,
+    data: PasswordResetConfirm,
+    session: DbSession,
+    redis: RedisClient,
+) -> ApiSuccess[None]:
+    """校验邮箱验证码后更新密码，并撤销该用户的所有 Refresh Session。"""
+
+    try:
+        await password_reset_service.confirm_password_reset(
+            session,
+            redis,
+            email=str(data.email),
+            code=data.code,
+            new_password=data.new_password,
+        )
+    except password_reset_service.PasswordResetCodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code",
+        ) from exc
+    return success_response(request, None, message="Password reset successful")
 
 
 @router.post("/password", response_model=ApiSuccess[None])

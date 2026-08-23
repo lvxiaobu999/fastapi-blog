@@ -12,7 +12,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 from dotenv import dotenv_values
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -54,12 +54,14 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         # 环境变量通常使用大写，字段使用小写；关闭大小写敏感可以直接完成映射。
         case_sensitive=False,
+        # 允许测试和代码显式使用字段名，同时兼容部署环境中的别名变量。
+        populate_by_name=True,
         # 不属于当前 Settings 的环境项交给其他组件使用，不因此阻止应用启动。
         extra="ignore",
     )
 
     env: Environment = "development"
-    project_title: str = "FastAPI Blog"
+    project_title: str = "三碗博客"
     database_url: str
     # 环境变量中的列表使用 JSON，例如 ALLOWED_HOSTS=["blog.example.com"]。这里不写协议、
     # 端口或路径。TrustedHostMiddleware 只接受列出的 Host，防止伪造 Header 影响跳转、链接
@@ -93,6 +95,60 @@ class Settings(BaseSettings):
     redis_key_prefix: str = "fastapi-blog"
     # Redis 故障应快速失败并由 API 返回 503，不能让登录/刷新请求长时间挂起。
     redis_socket_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
+    # SMTP 配置只在发送忘记密码邮件时使用；不在启动阶段强制校验，避免未配置邮件时影响登录等已有功能。
+    # QQ 邮箱建议使用 465 + SSL 或 587 + STARTTLS，并填写邮箱生成的“授权码”，不要填写 QQ 登录密码。
+    smtp_host: str = Field(
+        default="smtp.qq.com",
+        validation_alias=AliasChoices("SMTP_HOST", "MAIL_HOST"),
+    )
+    smtp_port: int = Field(
+        default=465,
+        ge=1,
+        le=65535,
+        validation_alias=AliasChoices("SMTP_PORT", "MAIL_PORT"),
+    )
+    smtp_use_ssl: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("SMTP_USE_SSL", "MAIL_USE_SSL"),
+    )
+    smtp_username: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SMTP_USERNAME", "MAIL_USERNAME"),
+    )
+    smtp_password: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SMTP_PASSWORD", "MAIL_PASSWORD"),
+    )
+    smtp_from_email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SMTP_FROM_EMAIL", "MAIL_FROM"),
+    )
+    smtp_from_name: str = Field(
+        default="三碗博客",
+        validation_alias=AliasChoices("SMTP_FROM_NAME", "MAIL_FROM_NAME"),
+    )
+    smtp_timeout_seconds: float = Field(
+        default=10.0,
+        gt=0,
+        le=60,
+        validation_alias=AliasChoices("SMTP_TIMEOUT_SECONDS", "MAIL_TIMEOUT_SECONDS"),
+    )
+    # 验证码只存 Redis 并设置短 TTL；错误次数和重发间隔用于降低暴力尝试与邮件滥发风险。
+    password_reset_code_ttl_seconds: int = Field(
+        default=600,
+        ge=60,
+        le=3600,
+        validation_alias=AliasChoices("PASSWORD_RESET_CODE_TTL_SECONDS"),
+    )
+    # 兼容当前 .env 使用的分钟写法；如果提供该变量，启动校验会换算成上面的秒数。
+    password_reset_expire_minutes: int | None = Field(
+        default=None,
+        ge=1,
+        le=60,
+        validation_alias=AliasChoices("PASSWORD_RESET_EXPIRE_MINUTES"),
+    )
+    password_reset_resend_interval_seconds: int = Field(default=60, ge=10, le=3600)
+    password_reset_max_attempts: int = Field(default=5, ge=1, le=20)
     # 开发环境通常使用 DEBUG/INFO，生产环境建议 INFO；设为 WARNING 会隐藏正常访问日志。
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     # text 适合人在终端阅读；json 适合 Loki、ELK 和云日志平台按字段查询。
@@ -117,6 +173,9 @@ class Settings(BaseSettings):
         的生产配置继续运行。
         """
 
+        if self.password_reset_expire_minutes is not None:
+            # .env 中的旧变量使用分钟，内部 Service 统一按秒处理 TTL。
+            self.password_reset_code_ttl_seconds = self.password_reset_expire_minutes * 60
         if self.env == "development" and not self.database_url.startswith("sqlite+aiosqlite://"):
             raise ValueError("Development DATABASE_URL must use SQLite with aiosqlite")
         if self.env == "production" and not self.database_url.startswith("postgresql+psycopg://"):

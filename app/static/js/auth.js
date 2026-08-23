@@ -90,6 +90,67 @@ $(function () {
         });
     });
 
+    $("[data-forgot-password]").on("click", function (event) {
+        // 登录页和导航弹窗共用同一个找回密码弹窗，避免维护两套验证码交互。
+        event.preventDefault();
+        const loginModal = document.querySelector("#loginModal");
+        if (loginModal) bootstrap.Modal.getOrCreateInstance(loginModal).hide();
+        const resetModal = document.querySelector("#passwordResetModal");
+        if (resetModal) bootstrap.Modal.getOrCreateInstance(resetModal).show();
+    });
+
+    $("[data-request-reset-code]").on("click", function () {
+        const button = this;
+        const $form = $(button).closest("[data-password-reset-form]");
+        const emailInput = $form.find("[name=email]")[0];
+        if (!emailInput?.reportValidity()) return;
+        if (!setButtonLoading(button, true, "发送中…")) return;
+        ajaxRequest({
+            url: "/api/auth/password-reset/request",
+            method: "POST",
+            data: {email: $form.find("[name=email]").val()},
+        }).done(() => {
+            showFeedback($form, "如果邮箱已注册，验证码已发送。", "success");
+        }).fail((xhr) => showFeedback($form, errorMessages(xhr)))
+            .always(() => setButtonLoading(button, false));
+    });
+
+    $("[data-password-reset-form]").on("submit", function (event) {
+        event.preventDefault();
+        const $form = $(this);
+        const newPassword = $form.find("[name=new_password]").val();
+        if (newPassword !== $form.find("[name=confirm_password]").val()) {
+            showFeedback($form, "两次输入的新密码不一致。");
+            return;
+        }
+        const button = $form.find("[type=submit]")[0];
+        if (!setButtonLoading(button, true, "重置中…")) return;
+        const resetEmail = $form.find("[name=email]").val();
+        ajaxRequest({
+            url: "/api/auth/password-reset/confirm",
+            method: "POST",
+            data: {
+                email: resetEmail,
+                code: $form.find("[name=code]").val(),
+                new_password: newPassword,
+                confirm_password: $form.find("[name=confirm_password]").val(),
+            },
+        }).done(() => {
+            showFeedback($form, "密码重置成功，请使用新密码登录。", "success");
+            $form[0].reset();
+            window.setTimeout(() => {
+                bootstrap.Modal.getOrCreateInstance(document.querySelector("#passwordResetModal")).hide();
+                const loginForm = document.querySelector("#loginModal [data-login-form]");
+                if (loginForm) {
+                    $(loginForm).find("[name=username]").val(resetEmail);
+                    showFeedback($(loginForm), "密码重置成功，请登录。", "success");
+                    bootstrap.Modal.getOrCreateInstance(document.querySelector("#loginModal")).show();
+                }
+            }, 700);
+        }).fail((xhr) => showFeedback($form, errorMessages(xhr)))
+            .always(() => setButtonLoading(button, false));
+    });
+
     $("[data-register-form]").on("submit", function (event) {
         // 确认密码只在前端比较，不发送给后端；真正密码规则仍由 Schema 校验。
         event.preventDefault();

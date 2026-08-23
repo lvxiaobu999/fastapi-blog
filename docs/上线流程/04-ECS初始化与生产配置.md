@@ -101,7 +101,7 @@ sudoedit /opt/fastapi-blog/config/app.env
 ```dotenv
 # 决定 Settings 启用生产校验；缺失时镜像内没有 .env，会默认成 development 并启动失败。
 ENV=production
-PROJECT_TITLE=FastAPI Blog
+PROJECT_TITLE=三碗博客
 
 # JSON 数组，只写主机名，不带 https://、端口或路径；第一个值供 Compose readiness 使用。
 ALLOWED_HOSTS=["<APP_DOMAIN>"]

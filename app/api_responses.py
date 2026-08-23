@@ -20,6 +20,7 @@ API_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     409: {"model": ApiFailure, "description": "Resource conflict"},
     422: {"model": ApiFailure, "description": "Request validation failed"},
     500: {"model": ApiFailure, "description": "Internal server error"},
+    503: {"model": ApiFailure, "description": "Service temporarily unavailable"},
 }
 
 

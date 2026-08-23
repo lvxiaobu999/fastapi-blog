@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "FastAPI Blog Debug",
+      "name": "三碗博客 Debug",
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",

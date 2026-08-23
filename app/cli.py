@@ -18,7 +18,7 @@ from app.services.users import UserAlreadyExistsError, create_user
 def build_parser() -> argparse.ArgumentParser:
     """构造管理命令解析器，后续可以在同一入口继续增加其他子命令。"""
 
-    parser = argparse.ArgumentParser(description="FastAPI Blog 管理命令")
+    parser = argparse.ArgumentParser(description="三碗博客 管理命令")
     parser.add_argument("command", choices=["create-admin"], help="要执行的管理操作")
     return parser
 

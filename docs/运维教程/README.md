@@ -1,6 +1,6 @@
 # 阿里云上线运维教程
 
-这套教程针对当前 FastAPI Blog：FastAPI/Uvicorn、PostgreSQL、Redis Refresh Session、
+这套教程针对当前 三碗博客：FastAPI/Uvicorn、PostgreSQL、Redis Refresh Session、
 本地 `/media` 上传目录、WebSocket 实时评论和 Alembic。建议第一次上线按以下顺序阅读：
 
 1. [01-架构选型与采购流程.md](01-架构选型与采购流程.md)：决定买什么、为什么买。

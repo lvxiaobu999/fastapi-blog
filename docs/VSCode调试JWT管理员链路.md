@@ -36,7 +36,7 @@ uv run python -m app.cli create-admin
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "FastAPI Blog",
+      "name": "三碗博客",
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
@@ -66,7 +66,7 @@ uv run python -m app.cli create-admin
 - `--reload` 适合开发，但文件变化时会重启子进程；如果断点不稳定，先删除 `--reload`。
 - `justMyCode: true` 会优先停在项目代码；需要查看 FastAPI 或 PyJWT 内部时再改为 `false`。
 
-选择左侧“运行和调试”，选中 `FastAPI Blog`，按 `F5` 启动。浏览器或 API 客户端访问 `http://127.0.0.1:8000`。
+选择左侧“运行和调试”，选中 `三碗博客`，按 `F5` 启动。浏览器或 API 客户端访问 `http://127.0.0.1:8000`。
 
 ## 三、推荐断点顺序
 

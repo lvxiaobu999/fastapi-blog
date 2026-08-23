@@ -109,3 +109,36 @@ def test_redis_prefix_rejects_cluster_hash_tag_braces() -> None:
             redis_key_prefix="blog:{shared}",
             _env_file=None,
         )
+
+
+def test_existing_mail_env_aliases_are_used_and_minutes_are_converted(tmp_path) -> None:
+    """兼容项目已有 MAIL_* 配置，并把验证码分钟数转换为 Service 使用的秒数。"""
+
+    env_file = tmp_path / "mail.env"
+    env_file.write_text(
+        """ENV=development
+DATABASE_URL=sqlite+aiosqlite:///./test.db
+SECRET_KEY=test-development-secret
+MAIL_HOST=smtp.example.test
+MAIL_PORT=587
+MAIL_USE_SSL=false
+MAIL_USERNAME=sender@example.test
+MAIL_PASSWORD=test-authorization-code
+MAIL_FROM=sender@example.test
+MAIL_FROM_NAME=三碗博客 Test
+PASSWORD_RESET_EXPIRE_MINUTES=15
+""",
+        encoding="utf-8",
+    )
+
+    settings = Settings(_env_file=env_file)
+
+    assert settings.smtp_host == "smtp.example.test"
+    assert settings.smtp_port == 587
+    assert settings.smtp_use_ssl is False
+    assert settings.smtp_username == "sender@example.test"
+    assert settings.smtp_from_email == "sender@example.test"
+    assert settings.smtp_from_name == "三碗博客 Test"
+    assert settings.smtp_password is not None
+    assert settings.smtp_password.get_secret_value() == "test-authorization-code"
+    assert settings.password_reset_code_ttl_seconds == 900
