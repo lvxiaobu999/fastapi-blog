@@ -172,6 +172,26 @@ docker run --rm --entrypoint sh "fastapi-blog:$imageTag" -c `
 应用真正启动会立即校验生产 Settings，并在 readiness 中连接 RDS/Tair，所以完整容器冒烟需要
 一套隔离的 PostgreSQL/Redis 或 staging 环境，不能拿生产凭据在开发机随意测试。
 
+### 10.1 静态文件的发布边界
+
+`app/static/`（CSS、JavaScript、Logo、favicon 和 vendor 文件）是代码发布物的一部分。Dockerfile
+通过 `COPY app ./app` 将它们写入 `fastapi-blog:<commit>` 镜像；生产 Compose 只把用户上传的
+`app/media` 挂载到宿主机。不要再创建或配置 `/opt/fastapi-blog/data/static`，也不要把它挂载到
+`/app/app/static`，否则宿主机旧目录会覆盖镜像中新版本的静态文件，造成“代码已更新但样式/图片仍旧或 404”。
+
+发布前可在不启动正式服务的情况下检查静态文件确实进入镜像：
+
+```bash
+docker compose --env-file "$COMPOSE_ENV" -f "$COMPOSE_FILE" run --rm --no-deps app sh -c \
+  'test -f /app/app/static/css/site.css && \
+   test -f /app/app/static/js/api.js && \
+   test -f /app/app/static/images/logo.png && \
+   test -f /app/app/static/images/favicon.ico'
+```
+
+若该检查失败，说明构建上下文、提交版本或 Dockerfile 不正确；不要通过手工复制到 `data/static`
+掩盖问题，应先修复镜像构建。
+
 ## 11. Compose 语法预检
 
 当前生产编排文件是 [compose.production.yaml](../../compose.production.yaml)。它需要两个层次

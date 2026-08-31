@@ -16,6 +16,7 @@ services:
       - "8000"
     volumes:
       - ${MEDIA_HOST_PATH:-/opt/fastapi-blog/data/media}:/app/app/media
+      # static 随镜像发布，不从宿主机 data/static 挂载，避免旧文件覆盖当前版本。
     restart: unless-stopped
     init: true
     healthcheck:

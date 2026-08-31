@@ -18,6 +18,8 @@ services:
     volumes:
       # 用户头像和文章图片写入 app/media；容器重建后仍由 ECS 数据盘保存。
       - ${MEDIA_HOST_PATH:-/opt/fastapi-blog/data/media}:/app/app/media
+      # 不要挂载 /opt/fastapi-blog/data/static。app/static 属于发布版本，已在 Dockerfile 的
+      # COPY app ./app 阶段写入镜像；额外挂载会覆盖镜像内新 CSS/JS/图片，导致版本不一致。
     restart: unless-stopped
     init: true
     healthcheck:

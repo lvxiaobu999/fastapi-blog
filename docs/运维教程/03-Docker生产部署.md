@@ -14,6 +14,10 @@
   nginx/default.conf       # Nginx 站点配置
 ```
 
+说明：仓库内的 `app/static/`（CSS、JS、Logo、favicon）随 Docker 镜像发布，不在 `data/` 下单独维护。
+不要建立 `/opt/fastapi-blog/data/static` 并挂载到 `/app/app/static`；该挂载会遮住镜像内的新文件，
+是生产环境出现“代码更新但样式/图片没更新”的常见原因。
+
 备份目标至少包括 RDS、`data/media` 和部署配置；不要只备份 Git 仓库。
 
 ## 2. Dockerfile
@@ -186,6 +190,15 @@ docker compose -f compose.production.yaml run --rm app uv run alembic current
 docker compose -f compose.production.yaml run --rm app uv run alembic upgrade head
 docker compose -f compose.production.yaml up -d --remove-orphans
 docker compose -f compose.production.yaml ps
+```
+
+`build app` 是静态文件同步的关键步骤：Dockerfile 会把当前提交的 `app/static` 一起复制进新镜像。
+仅执行 `up -d` 不会自动把工作树变化写入已存在的镜像。发布后可检查：
+
+```bash
+docker compose -f compose.production.yaml exec app sh -c \
+  'test -f /app/app/static/css/site.css && test -f /app/app/static/images/logo.png && test -f /app/app/static/images/favicon.ico'
+curl -fsSI "https://$APP_DOMAIN/static/css/site.css"
 ```
 
 不要在生产服务器直接修改源代码。发布前在 CI/本地至少执行 `uv run pytest -q` 和
