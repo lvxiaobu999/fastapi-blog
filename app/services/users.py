@@ -1,6 +1,6 @@
 """用户数据访问与业务规则。"""
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,42 @@ from app.services.auth import hash_password, verify_password
 
 class UserAlreadyExistsError(Exception):
     """用户名或邮箱违反唯一约束。"""
+
+
+def _normalize_provider_identity(provider: str, provider_user_id: str) -> tuple[str, str]:
+    """规范化第三方身份并拒绝不完整值。
+
+    平台名称统一保存为小写，避免 ``QQ`` 与 ``qq`` 被当作两个平台；平台用户 ID
+    只去除首尾空格，不改变中间内容。长度限制与 users 表字段保持一致。
+    """
+
+    normalized_provider = provider.strip().lower()
+    normalized_user_id = provider_user_id.strip()
+    if not normalized_provider or not normalized_user_id:
+        raise ValueError("provider and provider_user_id must be provided together")
+    if len(normalized_provider) > 32 or len(normalized_user_id) > 128:
+        raise ValueError("provider identity is too long")
+    return normalized_provider, normalized_user_id
+
+
+async def get_user_by_provider_identity(
+    session: AsyncSession, provider: str, provider_user_id: str
+) -> User | None:
+    """按第三方平台和平台用户 ID 查找已绑定的博客用户。
+
+    平台用户 ID 只在对应平台的命名空间内稳定，因此必须和 ``provider`` 一起查询；
+    这个复合条件也与数据库中的联合唯一约束保持一致。
+    """
+
+    normalized_provider, normalized_user_id = _normalize_provider_identity(
+        provider, provider_user_id
+    )
+    return await session.scalar(
+        select(User).where(
+            User.provider == normalized_provider,
+            User.provider_user_id == normalized_user_id,
+        )
+    )
 
 
 def _normalize_username(username: str) -> str:
@@ -102,6 +138,62 @@ async def create_user(session: AsyncSession, data: UserCreate, *, is_admin: bool
         await session.rollback()
         raise UserAlreadyExistsError from exc
 
+    await session.refresh(user)
+    return user
+
+
+async def create_provider_user(
+    session: AsyncSession,
+    *,
+    provider: str,
+    provider_user_id: str,
+    username: str,
+    email: str,
+    nickname: str,
+) -> User:
+    """创建首次第三方登录使用的账号。
+
+    第三方平台不会向本项目提供本站邮箱和密码，因此首次登录只保存平台身份和内部占位邮箱，
+    ``hashed_password`` 保持为空。用户可以一直使用第三方登录；如果希望增加账号密码登录，
+    必须在已认证的第三方会话中主动调用“设置密码”流程。占位邮箱不是可投递地址；用户登录
+    后应在资料页绑定真实邮箱，之后才能使用邮箱验证码找回密码。数据库唯一约束仍是并发
+    首次登录时的最终保障。
+    """
+
+    provider, provider_user_id = _normalize_provider_identity(provider, provider_user_id)
+
+    # 第三方登录服务只负责证明“平台身份”，不提供本站密码。这里仍复用本站
+    # username/email 的规范化和唯一性检查，确保账号可以被后台正常管理。
+    normalized_username = _normalize_username(username)
+    normalized_email = _normalize_email(email)
+    await _ensure_unique_identity(
+        session,
+        username=normalized_username,
+        email=normalized_email,
+    )
+    # provider/provider_user_id 是账号与第三方身份的唯一绑定；不要用昵称、邮箱
+    # 或 access_token 代替它们：昵称可变，邮箱可能是占位地址，token 也会过期。
+    user = User(
+        username=normalized_username,
+        email=normalized_email,
+        # 第三方登录本身就是该账号的认证方式；没有用户主动设置前，不伪造随机密码哈希。
+        hashed_password=None,
+        nickname=(nickname.strip() or f"{provider} 用户")[:50],
+        provider=provider,
+        provider_user_id=provider_user_id,
+    )
+    session.add(user)
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        # 两个并发回调可能同时完成预查询；若其中一个已经写入，复用已存在账号。
+        existing = await get_user_by_provider_identity(
+            session, provider, provider_user_id
+        )
+        if existing is not None:
+            return existing
+        raise UserAlreadyExistsError from exc
     await session.refresh(user)
     return user
 
@@ -252,7 +344,36 @@ async def stage_password_change(
     撤销 Redis Refresh Session，再提交数据库，使 Redis 故障时密码仍保持原值。
     """
 
-    if not await verify_password(current_password, user.hashed_password):
+    # QQ-only 账号没有旧密码，不能把 ``None`` 传给密码库；由 Router 按普通旧密码错误处理。
+    if user.hashed_password is None or not await verify_password(
+        current_password, user.hashed_password
+    ):
         return False
     user.hashed_password = await hash_password(new_password)
+    return True
+
+
+async def stage_password_setup(
+    session: AsyncSession, user: User, new_password: str
+) -> bool:
+    """为尚未设置本地密码的第三方登录用户暂存新密码哈希。
+
+    Router 已经通过 ``CurrentUser`` 验证第三方登录会话，并检查 ``provider`` 与
+    ``provider_user_id``。这里再用一次
+    条件更新兜住并发请求：只有数据库中的密码仍为 ``NULL`` 时才允许写入，避免两个同时
+    点击的请求互相覆盖。函数只 flush/提交前写入，不负责 Redis 会话撤销或最终 commit；
+    Router 会先撤销所有 Refresh Session，再提交数据库，保证设置密码后旧会话不能继续刷新。
+    """
+
+    new_hash = await hash_password(new_password)
+    result = await session.execute(
+        update(User)
+        .where(User.id == user.id, User.hashed_password.is_(None))
+        .values(hashed_password=new_hash)
+    )
+    if result.rowcount != 1:
+        await session.rollback()
+        return False
+    # expire_on_commit=False 且本请求稍后会序列化用户，主动同步内存中的 ORM 对象。
+    user.hashed_password = new_hash
     return True

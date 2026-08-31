@@ -40,6 +40,45 @@ function openLoginModal(message) {
     if (modal) bootstrap.Modal.getOrCreateInstance(modal).show();
 }
 
+function safeNextPath(value) {
+    // OAuth 回调中的 next 虽由服务端 state 提供，前端仍只接受当前站点的普通页面路径，
+    // 形成双层开放重定向防护。登录页自身改回首页，避免成功后仍停留在登录表单。
+    if (!value?.startsWith("/") || value.startsWith("//")) return "/";
+    if (value === "/login" || ["/api", "/static", "/media"].some(
+        (prefix) => value === prefix || value.startsWith(`${prefix}/`),
+    )) {
+        return "/";
+    }
+    return value;
+}
+
+function completeQQLogin() {
+    // QQ 回调不把本站 Access Token 放进 URL。服务端只设置 HttpOnly Refresh Cookie，
+    // 页面再通过已有 refresh 接口换取短期 Access Token，随后清理查询参数并跳回原页面。
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("qq");
+    if (!result) return false;
+    const pageForm = document.querySelector("main [data-login-form]")
+        ?? document.querySelector("[data-login-form]");
+    if (result !== "success") {
+        if (pageForm) showFeedback($(pageForm), "QQ 登录未完成，请重试或使用账号密码登录。");
+        window.history.replaceState({}, "", "/login");
+        return true;
+    }
+    ajaxRequest({
+        url: "/api/auth/refresh",
+        method: "POST",
+        refreshAuth: false,
+    }).done((token) => {
+        saveToken(token.access_token);
+        window.location.replace(safeNextPath(params.get("next")));
+    }).fail(() => {
+        if (pageForm) showFeedback($(pageForm), "QQ 登录会话已失效，请重新发起登录。");
+        window.history.replaceState({}, "", "/login");
+    });
+    return true;
+}
+
 // api.js 在受保护请求无法刷新会话时统一触发该事件，各业务模块无需重复操作模态框。
 document.addEventListener("blog:auth-required", (event) => {
     openLoginModal(event.detail?.message ?? "请重新登录后继续操作。");
@@ -50,10 +89,13 @@ $(function () {
     const adminContent = document.querySelector("[data-require-admin]");
     const adminDenied = document.querySelector("[data-admin-denied]");
 
+    if (completeQQLogin()) return;
+
     function applyCurrentUser(user) {
         // /auth/me 才是可信状态来源；缓存 Token 只用于避免首屏导航闪烁。
         setAuthState(true);
         setAdminState(user.is_admin);
+        syncPasswordModal(user);
         // 用户菜单由 /auth/me 的可信响应填充，不能从 localStorage 猜测昵称或头像。
         document.querySelectorAll("[data-current-user-avatar]").forEach((image) => {
             image.src = user.image_path;
@@ -77,6 +119,27 @@ $(function () {
         if (!adminContent) return;
         adminContent.hidden = !user.is_admin;
         if (adminDenied) adminDenied.hidden = user.is_admin;
+    }
+
+    function syncPasswordModal(user) {
+        // 产品上始终只保留一个密码入口：QQ-only 用户把它切换为“设置密码”，普通用户
+        // 保持“修改密码”。has_password 只是一项布尔状态，不包含敏感哈希，不会渲染两个按钮。
+        const form = document.querySelector("[data-password-form]");
+        if (!form) return;
+        const hasPassword = user.has_password !== false;
+        form.dataset.passwordMode = hasPassword ? "change" : "set";
+        const currentField = form.querySelector("[data-current-password-field]");
+        const currentInput = form.querySelector("[name=current_password]");
+        const title = document.querySelector("[data-password-modal-title]");
+        const menuLabel = document.querySelector("[data-password-menu-label]");
+        const hint = form.querySelector("[data-password-setup-hint]");
+        const submit = form.querySelector("[data-password-submit]");
+        if (currentField) currentField.hidden = !hasPassword;
+        if (currentInput) currentInput.required = hasPassword;
+        if (title) title.textContent = hasPassword ? "修改密码" : "设置密码";
+        if (menuLabel) menuLabel.textContent = hasPassword ? "修改密码" : "设置密码";
+        if (hint) hint.classList.toggle("d-none", hasPassword);
+        if (submit) submit.textContent = hasPassword ? "确认修改" : "设置密码";
     }
 
     $("[data-login-form]").on("submit", function (event) {
@@ -196,29 +259,36 @@ $(function () {
     $("[data-password-form]").on("submit", function (event) {
         event.preventDefault();
         const $form = $(this);
+        const isSettingPassword = this.dataset.passwordMode === "set";
         const newPassword = $form.find("[name=new_password]").val();
         if (newPassword !== $form.find("[name=confirm_password]").val()) {
             showFeedback($form, "两次输入的新密码不一致。");
             return;
         }
         const button = $form.find("[type=submit]")[0];
-        if (!setButtonLoading(button, true, "修改中…")) return;
+        if (!setButtonLoading(button, true, isSettingPassword ? "设置中…" : "修改中…")) return;
+        const requestData = {
+            new_password: newPassword,
+            confirm_password: $form.find("[name=confirm_password]").val(),
+        };
+        if (!isSettingPassword) requestData.current_password = $form.find("[name=current_password]").val();
         ajaxRequest({
-            url: "/api/auth/password",
+            url: isSettingPassword ? "/api/auth/password/set" : "/api/auth/password",
             method: "POST",
             auth: true,
-            data: {
-                current_password: $form.find("[name=current_password]").val(),
-                new_password: newPassword,
-                confirm_password: $form.find("[name=confirm_password]").val(),
-            },
+            data: requestData,
         }).done(() => {
             // 后端已经撤销该用户全部 Redis Refresh Session。无状态 Access JWT 无法由
             // Redis 立即撤销，因此前端同步删除本地 Access Token，并刷新成游客状态。
             clearToken();
             setAuthState(false);
-            showFeedback($form, "密码修改成功，请重新登录。", "success");
+            showToast(
+                isSettingPassword ? "密码设置成功，请重新登录。" : "密码修改成功，请重新登录。",
+                "success",
+            );
             $form[0].reset();
+            const passwordModal = document.querySelector("#passwordModal");
+            if (passwordModal) bootstrap.Modal.getOrCreateInstance(passwordModal).hide();
             window.setTimeout(() => window.location.reload(), 600);
         }).fail((xhr) => showFeedback($form, errorMessages(xhr)))
             .always(() => setButtonLoading(button, false));

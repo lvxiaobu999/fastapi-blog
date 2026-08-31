@@ -64,6 +64,17 @@
                 <div class="form-label-row"><span></span><a href="#password-reset" data-forgot-password>忘记密码？</a></div>
                 <button class="btn btn-primary" type="submit">登录</button>
             </form>
+            {% if qq_login_enabled %}
+            <div class="third-party-login modal-third-party-login" aria-label="第三方登录">
+                <div class="third-party-divider"><span>其他登录方式</span></div>
+                <a class="btn qq-login-button"
+                   href="{{ url_for('qq_login') }}?next_path={{ request.url.path | urlencode }}"
+                   data-qq-login>
+                    <span class="qq-login-mark" aria-hidden="true">Q</span>
+                    <span>使用 QQ 登录</span>
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

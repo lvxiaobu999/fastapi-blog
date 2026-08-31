@@ -96,7 +96,7 @@
                                 <button class="user-popover-link" type="button" data-bs-toggle="modal"
                                         data-bs-target="#passwordModal">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>
-                                    <span>修改密码</span>
+                                    <span data-password-menu-label>修改密码</span>
                                 </button>
                             </div>
                             <button class="user-popover-logout" type="button" data-logout>退出登录</button>
@@ -166,6 +166,17 @@
                 <div class="form-label-row"><span></span><a href="#password-reset" data-forgot-password>忘记密码？</a></div>
                 <button class="btn btn-primary" type="submit">登录</button>
             </form>
+            {% if qq_login_enabled %}
+            <div class="third-party-login modal-third-party-login" aria-label="第三方登录">
+                <div class="third-party-divider"><span>其他登录方式</span></div>
+                <a class="btn qq-login-button"
+                   href="{{ url_for('qq_login') }}?next_path={{ request.url.path | urlencode }}"
+                   data-qq-login>
+                    <span class="qq-login-mark" aria-hidden="true">Q</span>
+                    <span>使用 QQ 登录</span>
+                </a>
+            </div>
+            {% endif %}
         </div></div>
     </div>
 
@@ -221,18 +232,32 @@
                            placeholder="请再次输入密码" required></div>
                 <button class="btn btn-primary" type="submit">注册账号</button>
             </form>
+            {% if qq_login_enabled %}
+            <div class="third-party-login modal-third-party-login" aria-label="第三方注册">
+                <div class="third-party-divider"><span>免填表单</span></div>
+                <a class="btn qq-login-button"
+                   href="{{ url_for('qq_login') }}?next_path={{ request.url.path | urlencode }}"
+                   data-qq-login>
+                    <span class="qq-login-mark" aria-hidden="true">Q</span>
+                    <span>使用 QQ 登录并注册</span>
+                </a>
+            </div>
+            {% endif %}
         </div></div>
     </div>
 
     <div class="modal fade" id="passwordModal" tabindex="-1" aria-labelledby="passwordModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-            <div class="modal-header"><h2 class="modal-title fs-5" id="passwordModalTitle">修改密码</h2>
+            <div class="modal-header"><h2 class="modal-title fs-5" id="passwordModalTitle" data-password-modal-title>修改密码</h2>
                 <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭"></button></div>
             <form class="modal-body stacked-form" data-password-form>
                 <div class="alert d-none" role="alert" data-form-feedback></div>
-                <div><label class="form-label" for="current-password">当前密码</label>
+                <div data-current-password-field><label class="form-label" for="current-password">当前密码</label>
                     <input class="form-control" id="current-password" name="current_password"
                            type="password" autocomplete="current-password" placeholder="请输入当前密码" required></div>
+                <p class="form-text d-none" data-password-setup-hint>
+                    你正在使用 QQ 登录。设置密码后，可以使用账号密码登录；设置完成后需要重新登录。
+                </p>
                 <div><label class="form-label" for="new-password">新密码</label>
                     <input class="form-control" id="new-password" name="new_password" type="password"
                            minlength="8" maxlength="128" autocomplete="new-password"
@@ -241,7 +266,7 @@
                     <input class="form-control" id="confirm-password" name="confirm_password" type="password"
                            minlength="8" maxlength="128" autocomplete="new-password"
                            placeholder="请再次输入新密码" required></div>
-                <button class="btn btn-primary" type="submit">确认修改</button>
+                <button class="btn btn-primary" type="submit" data-password-submit>确认修改</button>
             </form>
         </div></div>
     </div>

@@ -377,3 +377,101 @@ async def test_change_password_requires_current_password(client: AsyncClient) ->
     assert revoked.status_code == 401
     assert (await login(client, password="password123")).status_code == 401
     assert (await login(client, password="newpassword123")).status_code == 200
+
+
+async def test_qq_only_user_can_set_password_without_current_password(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    fake_redis: FakeRedis,
+) -> None:
+    """QQ-only 用户首次设置密码不需要旧密码，成功后旧 Refresh Session 立即失效。"""
+
+    async with session_factory() as session:
+        user = User(
+            username="qq_only",
+            email="qq_only@qq-accounts.internal",
+            hashed_password=None,
+            nickname="QQ 用户",
+            provider="qq",
+            provider_user_id="qq-openid-for-password-setup",
+        )
+        session.add(user)
+        await session.commit()
+        user_id = user.id
+
+    access_token = create_access_token(user_id)
+    old_refresh = await create_refresh_session(fake_redis, user_id)
+    setup = await client.post(
+        "/api/auth/password/set",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"new_password": "newpassword123", "confirm_password": "newpassword123"},
+    )
+
+    assert setup.status_code == 200
+    assert setup.json()["message"] == "Password set successfully"
+    assert "refresh_token=" in setup.headers.get("set-cookie", "")
+    repeated = await client.post(
+        "/api/auth/password/set",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"new_password": "another123", "confirm_password": "another123"},
+    )
+    assert repeated.status_code == 409
+    assert (
+        await client.post(
+            "/api/auth/refresh",
+            headers={"Cookie": f"refresh_token={old_refresh}"},
+        )
+    ).status_code == 401
+    assert (await login(client, username="qq_only", password="newpassword123")).status_code == 200
+
+    async with session_factory() as session:
+        stored = await session.get(User, user_id)
+        assert stored is not None
+        assert stored.has_password is True
+        assert await verify_password("newpassword123", stored.hashed_password) is True
+
+
+async def test_qq_only_user_cannot_use_change_password_without_setup(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """QQ-only 用户误调用修改密码接口时返回 400，而不是把空哈希传入密码库导致 500。"""
+
+    async with session_factory() as session:
+        user = User(
+            username="qq_only_change",
+            email="qq_only_change@qq-accounts.internal",
+            hashed_password=None,
+            nickname="QQ 用户",
+            provider="qq",
+            provider_user_id="qq-openid-for-change-guard",
+        )
+        session.add(user)
+        await session.commit()
+        user_id = user.id
+
+    response = await client.post(
+        "/api/auth/password",
+        headers={"Authorization": f"Bearer {create_access_token(user_id)}"},
+        json={
+            "current_password": "not-set",
+            "new_password": "newpassword123",
+            "confirm_password": "newpassword123",
+        },
+    )
+    assert response.status_code == 400
+
+
+async def test_password_setup_rejects_non_qq_account(client: AsyncClient) -> None:
+    """普通密码账号不能绕过旧密码校验调用 QQ-only 首次设置接口。"""
+
+    await register(client, username="password_user")
+    token = (await login(client, username="password_user")).json()["data"]["access_token"]
+    response = await client.post(
+        "/api/auth/password/set",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"new_password": "another123", "confirm_password": "another123"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["message"] == "Password setup requires an external login account"

@@ -19,6 +19,25 @@ class PasswordChangeRequest(BaseModel):
         return self
 
 
+class PasswordSetRequest(BaseModel):
+    """QQ-only 用户首次启用账号密码登录时提交的两次新密码。
+
+    该请求不接收 ``current_password``：QQ OAuth 会话已经完成身份认证，接口只允许
+    ``hashed_password`` 仍为空的 QQ 用户调用。已设置过密码的用户必须使用修改密码接口。
+    """
+
+    new_password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "PasswordSetRequest":
+        """在进入 Service 前拒绝两次输入不一致的新密码。"""
+
+        if self.new_password != self.confirm_password:
+            raise ValueError("New passwords do not match")
+        return self
+
+
 class PasswordResetRequest(BaseModel):
     """请求向已注册邮箱发送一次性密码重置验证码。"""
 

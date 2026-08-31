@@ -153,6 +153,8 @@ async def test_layout_includes_loading_and_session_scripts(client: AsyncClient) 
     assert "/static/js/auth.js" in response.text
     assert ui_script.status_code == 200
     assert "setButtonLoading" in ui_script.text
+    assert "button.style.height" in ui_script.text
+    assert "buttonRect.height" in ui_script.text
     assert "let refreshPromise = null" in api_script.text
     assert "图片上传与 JSON API 共享同一个 Refresh Promise" in api_script.text
     assert bootstrap_state.status_code == 200
@@ -181,6 +183,12 @@ async def test_layout_has_authenticated_user_menu_and_password_modal(client: Asy
     assert '/admin"' in response.text
     assert 'id="passwordModal"' in response.text
     assert "data-password-form" in response.text
+    # 产品上只保留一个密码入口；账号类型只改变该入口的文案和弹窗模式。
+    assert response.text.count('data-bs-target="#passwordModal"') == 1
+    assert response.text.count("data-password-menu-label") == 1
+    assert "data-current-password-field" in response.text
+    assert "data-password-setup-hint" in response.text
+    assert "data-password-modal-title" in response.text
     assert 'id="modal-login-password"' in response.text
     assert 'placeholder="请输入登录密码"' in response.text
     assert 'placeholder="请输入注册邮箱"' in response.text

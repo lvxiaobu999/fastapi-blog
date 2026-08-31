@@ -149,6 +149,28 @@ class Settings(BaseSettings):
     )
     password_reset_resend_interval_seconds: int = Field(default=60, ge=10, le=3600)
     password_reset_max_attempts: int = Field(default=5, ge=1, le=20)
+    # QQ 互联 OAuth 2.0 配置。三项凭据由 QQ 互联应用控制台创建；未配置时不显示 QQ
+    # 登录入口，普通用户名/密码登录仍可正常使用。SecretStr 防止 Client Secret 被日志或
+    # Settings repr 意外输出。回调地址必须与 QQ 控制台逐字匹配，生产环境应使用 HTTPS。
+    qq_client_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("QQ_CLIENT_ID", "QQ_APP_ID"),
+    )
+    qq_client_secret: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("QQ_CLIENT_SECRET", "QQ_APP_KEY"),
+    )
+    qq_redirect_uri: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("QQ_REDIRECT_URI"),
+    )
+    qq_authorize_url: str = "https://graph.qq.com/oauth2.0/authorize"
+    qq_token_url: str = "https://graph.qq.com/oauth2.0/token"
+    qq_openid_url: str = "https://graph.qq.com/oauth2.0/me"
+    qq_userinfo_url: str = "https://graph.qq.com/user/get_user_info"
+    # state 只在 Redis 中短暂保存，用于防止回调被跨站请求伪造；过期后必须重新发起登录。
+    qq_oauth_state_ttl_seconds: int = Field(default=600, ge=60, le=1800)
+    qq_http_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
     # 开发环境通常使用 DEBUG/INFO，生产环境建议 INFO；设为 WARNING 会隐藏正常访问日志。
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     # text 适合人在终端阅读；json 适合 Loki、ELK 和云日志平台按字段查询。
@@ -214,6 +236,24 @@ class Settings(BaseSettings):
             # Refresh Session 自己使用花括号控制 Redis Cluster hash slot；允许配置层注入
             # 花括号会改变脚本 Key 的分片结果，使本应原子的 Lua 操作在集群中失败。
             raise ValueError("REDIS_KEY_PREFIX must not contain Redis hash tag braces")
+        qq_secret = (
+            self.qq_client_secret.get_secret_value() if self.qq_client_secret is not None else None
+        )
+        qq_configured = any(
+            value is not None for value in (self.qq_client_id, qq_secret, self.qq_redirect_uri)
+        )
+        if qq_configured and not all((self.qq_client_id, qq_secret, self.qq_redirect_uri)):
+            raise ValueError(
+                "QQ_CLIENT_ID, QQ_CLIENT_SECRET and QQ_REDIRECT_URI must be configured together"
+            )
+        if self.qq_redirect_uri and not self.qq_redirect_uri.startswith(("http://", "https://")):
+            raise ValueError("QQ_REDIRECT_URI must use http:// or https://")
+        if (
+            self.env == "production"
+            and self.qq_redirect_uri
+            and not self.qq_redirect_uri.startswith("https://")
+        ):
+            raise ValueError("Production QQ_REDIRECT_URI must use HTTPS")
         redis_url = self.redis_url.get_secret_value()
         if not redis_url.startswith(("redis://", "rediss://")):
             raise ValueError("REDIS_URL must use redis:// or rediss://")

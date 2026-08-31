@@ -15,9 +15,11 @@ export function setButtonLoading(button, loading, loadingText = "处理中…") 
         button.dataset.loading = "true";
         button.dataset.idleHtml = button.innerHTML;
         button.dataset.idleAriaLabel = button.getAttribute("aria-label") ?? "";
-        // 先记录 border-box 宽度，再让 loading 内容绝对定位。这样 spinner 和文案
-        // 不会参与按钮的正常排版，也不会把“发送验证码”按钮横向撑大。
-        button.style.width = `${Math.ceil(button.getBoundingClientRect().width)}px`;
+        // 先记录 border-box 宽高，再让 loading 内容绝对定位。绝对定位内容不会参与
+        // 按钮正常排版；同时固定原尺寸，避免登录/注册按钮在替换文字后高度塌缩。
+        const buttonRect = button.getBoundingClientRect();
+        button.style.width = `${Math.ceil(buttonRect.width)}px`;
+        button.style.height = `${Math.ceil(buttonRect.height)}px`;
         button.classList.add("button-is-loading");
         button.disabled = true;
 
@@ -40,6 +42,7 @@ export function setButtonLoading(button, loading, loadingText = "处理中…") 
     button.innerHTML = button.dataset.idleHtml;
     button.disabled = false;
     button.style.width = "";
+    button.style.height = "";
     button.classList.remove("button-is-loading");
     if (button.dataset.idleAriaLabel) {
         button.setAttribute("aria-label", button.dataset.idleAriaLabel);

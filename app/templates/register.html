@@ -49,6 +49,18 @@
             <button class="btn btn-primary btn-lg w-100" type="submit">注册账号</button>
         </form>
 
+        {% if qq_login_enabled %}
+        <div class="third-party-login" aria-label="第三方注册">
+            <div class="third-party-divider"><span>免填表单</span></div>
+            <a class="btn qq-login-button"
+               href="{{ url_for('qq_login') }}?next_path=/"
+               data-qq-login>
+                <span class="qq-login-mark" aria-hidden="true">Q</span>
+                <span>使用 QQ 登录并注册</span>
+            </a>
+        </div>
+        {% endif %}
+
         <p class="auth-switch">已经有账号？ <a href="{{ url_for('login') }}">直接登录</a></p>
     </section>
 </div>

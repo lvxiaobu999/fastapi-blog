@@ -86,6 +86,11 @@ async def authenticate_user(session: AsyncSession, username: str, password: str)
     if user is None:
         await verify_password(password, _DUMMY_PASSWORD_HASH)
         return None
+    # QQ-only 账号在用户主动设置本地密码前，数据库字段为 NULL。仍执行一次固定哈希校验，
+    # 保持与普通密码错误接近的计算成本，并统一返回“用户名或密码错误”，不暴露账号类型。
+    if user.hashed_password is None:
+        await verify_password(password, _DUMMY_PASSWORD_HASH)
+        return None
     verified = await verify_password(password, user.hashed_password)
     return user if verified else None
 

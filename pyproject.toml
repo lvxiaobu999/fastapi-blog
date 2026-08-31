@@ -12,6 +12,8 @@ dependencies = [
     "alembic>=1.18.5",
     # Web 框架及其 standard 运行依赖，包括 FastAPI CLI 和 Uvicorn。
     "fastapi[standard]>=0.139.1",
+    # 异步 HTTP 客户端，用于服务端调用 QQ 互联 Token、openid 和用户资料接口。
+    "httpx>=0.28.1",
     # PostgreSQL 生产环境驱动；binary 变体便于部署，无需本机编译 libpq。
     "psycopg[binary]>=3.3.4",
     # 使用 Argon2 算法生成和验证密码哈希。

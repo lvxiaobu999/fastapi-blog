@@ -1,11 +1,13 @@
 """OAuth2 Password Flow 登录接口；负责 HTTP 表单解析和认证失败响应。"""
 
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import RedirectResponse
 
 from app.api_responses import API_ERROR_RESPONSES, success_response
 from app.core import get_settings
@@ -18,12 +20,14 @@ from app.schemas.auth import (
     PasswordChangeRequest,
     PasswordResetConfirm,
     PasswordResetRequest,
+    PasswordSetRequest,
     TokenResponse,
 )
 from app.schemas.user import UserResponse
 from app.services import auth as auth_service
 from app.services import email as email_service
 from app.services import password_reset as password_reset_service
+from app.services import qq_oauth
 from app.services import refresh_sessions as refresh_session_service
 from app.services import users as user_service
 
@@ -107,6 +111,59 @@ async def oauth2_login(
     token, refresh_token = await _authenticate(form, session, redis)
     _set_refresh_cookie(response, refresh_token)
     return token
+
+
+def _qq_redirect(next_path: str = "/", result: str = "success") -> RedirectResponse:
+    """把 QQ 回调结果带回登录页；Access Token 不放在 URL，稍后由 Refresh Cookie 换取。"""
+
+    query = urlencode({"qq": result, "next": next_path})
+    return RedirectResponse(url=f"/login?{query}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/qq/login", include_in_schema=False)
+async def qq_login(
+    redis: RedisClient,
+    next_path: str | None = None,
+) -> RedirectResponse:
+    """创建 QQ OAuth state 并跳转到 QQ 授权页。"""
+
+    if not qq_oauth.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="QQ login is not configured",
+        )
+    state, _ = await qq_oauth.create_state(redis, next_path)
+    return RedirectResponse(
+        url=qq_oauth.authorization_url(state),
+        status_code=status.HTTP_302_FOUND,
+    )
+
+
+@router.get("/qq/callback", include_in_schema=False)
+async def qq_callback(
+    session: DbSession,
+    redis: RedisClient,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+) -> RedirectResponse:
+    """处理 QQ 回调，创建本项目 Refresh Session 后回到登录页完成会话交换。"""
+
+    if error or not code or not state:
+        return _qq_redirect(result="error")
+    try:
+        next_path = await qq_oauth.consume_state(redis, state)
+        access_token = await qq_oauth.exchange_code(code)
+        profile = await qq_oauth.fetch_profile(access_token)
+        user = await qq_oauth.get_or_create_user(session, profile)
+        refresh_token = await refresh_session_service.create_refresh_session(redis, user.id)
+    except qq_oauth.QQOAuthStateError:
+        return _qq_redirect(result="error")
+    except qq_oauth.QQOAuthError:
+        return _qq_redirect(result="error")
+    response = _qq_redirect(next_path)
+    _set_refresh_cookie(response, refresh_token)
+    return response
 
 
 @router.post("/refresh", response_model=ApiSuccess[TokenResponse])
@@ -231,3 +288,43 @@ async def change_password(
     await session.commit()
     response.delete_cookie("refresh_token", path="/api")
     return success_response(request, None)
+
+
+@router.post("/password/set", response_model=ApiSuccess[None])
+async def set_password(
+    request: Request,
+    response: Response,
+    data: PasswordSetRequest,
+    session: DbSession,
+    redis: RedisClient,
+    current_user: CurrentUser,
+) -> ApiSuccess[None]:
+    """让没有本站密码的第三方登录用户在已认证会话中首次设置本地密码。
+
+    第三方 OAuth 已经完成身份认证，因此首次设置不要求不存在的旧密码；但接口只接受绑定了
+    ``provider/provider_user_id`` 且 ``hashed_password`` 为空的账号。设置完成后撤销所有 Refresh Session，
+    前端清除当前 Access Token 并要求重新登录，避免旧设备继续保持长期会话。
+    """
+
+    # 只有已绑定第三方身份且尚未设置本站密码的账号，才能走首次设置流程。
+    # 判断使用通用复合字段，未来微信登录无需再增加一套接口。
+    if not (current_user.provider and current_user.provider_user_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password setup requires an external login account",
+        )
+    if current_user.hashed_password is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Password is already set; use the change-password endpoint",
+        )
+    if not await user_service.stage_password_setup(session, current_user, data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Password is already set; use the change-password endpoint",
+        )
+    # 与修改密码保持相同的会话撤销边界：Redis 失败时不会提交尚未 commit 的新哈希。
+    await refresh_session_service.revoke_user_refresh_sessions(redis, current_user.id)
+    await session.commit()
+    response.delete_cookie("refresh_token", path="/api")
+    return success_response(request, None, message="Password set successfully")

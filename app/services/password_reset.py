@@ -141,6 +141,14 @@ async def request_password_reset(
     if user is None:
         # 即使邮箱不存在也保留冷却窗口，降低通过接口进行邮件/数据库探测的风险。
         return
+    if (
+        user.provider == "qq"
+        and user.provider_user_id
+        and normalized_email.endswith("@qq-accounts.internal")
+    ):
+        # QQ 首次登录生成的是不可投递的内部占位邮箱。保持与“邮箱不存在”相同的静默
+        # 响应，既不尝试向伪地址发信，也不暴露账号类型；用户需先在个人资料绑定真实邮箱。
+        return
 
     code = _new_code()
     # 邮件里需要明文 code，但 Redis 只保存摘要。payload 序列化为 JSON 是因为

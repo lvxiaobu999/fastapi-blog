@@ -56,6 +56,10 @@ class UserResponse(UserPrivate):
 
     model_config = ConfigDict(from_attributes=True)
 
+    # 前端据此在 QQ-only 用户的个人菜单显示“设置密码”，而不是要求不存在的旧密码。
+    # 这里只返回布尔状态，绝不序列化 User.hashed_password。
+    has_password: bool
+
 
 class AdminUserCreate(UserCreate):
     """管理员后台创建用户的请求；角色字段只在管理员接口出现。"""

@@ -142,3 +142,46 @@ PASSWORD_RESET_EXPIRE_MINUTES=15
     assert settings.smtp_password is not None
     assert settings.smtp_password.get_secret_value() == "test-authorization-code"
     assert settings.password_reset_code_ttl_seconds == 900
+
+
+def test_qq_oauth_configuration_must_be_complete() -> None:
+    """QQ Client ID、Secret 和回调地址必须成组配置，避免显示无法完成的登录入口。"""
+
+    with pytest.raises(ValidationError, match="must be configured together"):
+        Settings(
+            database_url="sqlite+aiosqlite://",
+            secret_key=SecretStr("development-secret"),
+            qq_client_id="10001",
+            _env_file=None,
+        )
+
+
+def test_qq_oauth_aliases_and_redirect_security() -> None:
+    """兼容 QQ 控制台 App ID/Key 命名，生产回调必须使用 HTTPS。"""
+
+    settings = Settings(
+        database_url="sqlite+aiosqlite://",
+        secret_key=SecretStr("development-secret"),
+        QQ_APP_ID="10001",
+        QQ_APP_KEY="test-app-key",
+        QQ_REDIRECT_URI="http://127.0.0.1:8000/api/auth/qq/callback",
+        _env_file=None,
+    )
+
+    assert settings.qq_client_id == "10001"
+    assert settings.qq_client_secret is not None
+    assert settings.qq_client_secret.get_secret_value() == "test-app-key"
+
+    with pytest.raises(ValidationError, match="must use HTTPS"):
+        Settings(
+            env="production",
+            database_url="postgresql+psycopg://app:placeholder@db.internal/blog",
+            secret_key=SecretStr("test-only-secret-with-at-least-32-characters"),
+            redis_url=SecretStr("rediss://cache.internal:6379/0"),
+            allowed_hosts=["blog.example.com"],
+            auth_cookie_secure=True,
+            qq_client_id="10001",
+            qq_client_secret=SecretStr("test-app-key"),
+            qq_redirect_uri="http://blog.example.com/api/auth/qq/callback",
+            _env_file=None,
+        )

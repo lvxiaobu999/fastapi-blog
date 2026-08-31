@@ -164,7 +164,16 @@ sudo stat -c '%a %U %G %n' /opt/fastapi-blog/config/app.env
 
 ## 6. 配置 Compose 参数
 
-每次 shell 会话设置：
+这里有两层容易混淆的配置：
+
+1. 下面这组 `APP_*` 和 `MEDIA_HOST_PATH`、`TLS_HOST_PATH` 是 **Docker Compose 插值参数**。它们由
+   Compose 在读取 `compose.production.yaml` 时使用，决定域名、镜像标签和宿主机目录；它们不是
+   FastAPI 的业务配置。
+2. `/opt/fastapi-blog/config/app.env` 是 **应用运行时配置**。Compose 会把其中的变量注入 `app`
+   容器，FastAPI 的 Settings 再读取 `ENV`、`DATABASE_URL`、`REDIS_URL`、`SECRET_KEY` 等值。
+   数据库密码、Redis 密码和 JWT Secret 只放在这个受限文件中，不要放进下面的 `export` 命令。
+
+每次登录服务器或打开新的 shell 后，都要重新设置 Compose 参数：
 
 ```bash
 cd /opt/fastapi-blog/current
@@ -175,11 +184,32 @@ export MEDIA_HOST_PATH=/opt/fastapi-blog/data/media
 export TLS_HOST_PATH=/opt/fastapi-blog/secrets/tls
 ```
 
-这些是 Compose 路径/域名参数，不包含数据库密码。不要把 `DATABASE_URL`、`REDIS_URL` 或
-`SECRET_KEY` 直接 `export` 到命令历史。
+参数逐项说明：
 
-后续所有 Compose 命令必须在这些变量存在的同一 shell 执行。可以把非敏感参数放入受控部署
-脚本，但 `APP_IMAGE_TAG` 每次发布都应更新为当前 commit。
+| 参数 | Compose 中的用途 | 为什么需要它 | 改错或不设置的结果 |
+|---|---|---|---|
+| `APP_DOMAIN` | 替换 Nginx 模板中的 `${APP_DOMAIN}`，生成 `server_name`、HTTP 到 HTTPS 的跳转地址和转发时的 `Host` | 让浏览器访问的域名、Nginx、证书和 FastAPI `ALLOWED_HOSTS` 使用同一个正式入口 | 未设置时 Compose 直接报错；写成带 `https://`、端口或错误域名时会出现证书不匹配、跳转错误或 `400 Invalid Host` |
+| `APP_IMAGE_TAG` | 指定应用镜像名 `fastapi-blog:<标签>` | 把正在运行的容器和已测试的 Git commit/tag 对应起来，便于发布记录和回滚 | 不更新可能继续运行旧镜像；使用含糊的 `latest` 会难以确认线上实际版本 |
+| `APP_ENV_FILE` | 指定 Compose 读取并注入 `app` 容器的环境文件 | 将生产数据库、Redis、JWT 和 Cookie 配置放在仓库外的受限文件中 | 路径错误或文件缺失时，应用可能因缺少生产配置而无法启动；不要把它改成仓库中的开发 `.env` |
+| `MEDIA_HOST_PATH` | 将宿主机目录绑定到容器 `/app/app/media` | 用户头像和文章图片必须存放在容器外，重建容器后才能保留 | 目录不存在或 UID 10001 无写权限时，上传失败或重建后文件看似丢失 |
+| `TLS_HOST_PATH` | 将宿主机证书目录只读绑定到 Nginx `/etc/nginx/tls` | Nginx 需要从固定位置读取 `fullchain.pem` 和 `privkey.pem`，FastAPI 本身不终止 TLS | 路径错误或文件缺失时 Nginx `nginx -t` 失败，443 无法启动；私钥不能提交 Git |
+
+其中 `APP_DOMAIN`、证书中的域名以及 `app.env` 的 `ALLOWED_HOSTS` 必须一致；`APP_IMAGE_TAG`
+应来自当前已测试版本，例如 `git rev-parse --short HEAD`；两个目录参数必须是 **ECS 宿主机**
+上的绝对路径，而不是容器内路径。
+
+可以用下面的命令只检查非敏感参数是否存在，不会打印 `app.env` 内容：
+
+```bash
+printf 'APP_DOMAIN=%s\nAPP_IMAGE_TAG=%s\nAPP_ENV_FILE=%s\nMEDIA_HOST_PATH=%s\nTLS_HOST_PATH=%s\n' \
+  "$APP_DOMAIN" "$APP_IMAGE_TAG" "$APP_ENV_FILE" "$MEDIA_HOST_PATH" "$TLS_HOST_PATH"
+docker compose -f compose.production.yaml config -q
+```
+
+后续所有 Compose 命令必须在这些变量存在的同一 shell 执行。shell 关闭后 `export` 会失效，
+下一次登录需要重新设置；也可以把这五个非敏感参数放入受控部署脚本，但每次发布仍应更新
+`APP_IMAGE_TAG`。不要使用 `docker compose config`（不带 `-q`）把展开后的配置完整输出到日志，
+因为其中可能包含 `env_file` 相关的敏感信息。
 
 ## 7. 准备 TLS 文件
 

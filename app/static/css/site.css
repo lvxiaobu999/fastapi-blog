@@ -398,6 +398,32 @@ html[data-auth-state="user"][data-admin-state="true"] [data-auth-admin] {
 .form-label-row .form-label { margin-bottom: .5rem; }
 .form-label-row a, .auth-switch a { color: var(--link-color); }
 .auth-switch { margin: 24px 0 0; color: var(--text-muted); text-align: center; }
+.third-party-login { display: grid; gap: 14px; margin-top: 22px; }
+.modal-third-party-login { margin: 0 22px 22px; }
+.third-party-divider { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: .78rem; }
+.third-party-divider::before, .third-party-divider::after { height: 1px; flex: 1; background: var(--panel-border); content: ""; }
+.qq-login-button {
+    display: inline-flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    border: 1px solid color-mix(in srgb, #12b7f5 48%, var(--panel-border));
+    color: color-mix(in srgb, #0a8fc4 82%, var(--text-main));
+    background: color-mix(in srgb, #12b7f5 7%, var(--panel-bg));
+}
+.qq-login-button:hover, .qq-login-button:focus-visible {
+    border-color: #12b7f5;
+    color: #fff;
+    background: #12b7f5;
+    box-shadow: 0 0 0 3px color-mix(in srgb, #12b7f5 22%, transparent);
+}
+.qq-login-mark {
+    display: inline-grid; width: 22px; height: 22px; place-items: center; border-radius: 50%;
+    color: #fff; background: #12b7f5; font-size: .75rem; font-weight: 850;
+}
+.qq-login-button:hover .qq-login-mark, .qq-login-button:focus-visible .qq-login-mark { color: #12b7f5; background: #fff; }
 .modal-header { padding: 18px 22px; border-color: var(--panel-border); }
 .modal-body { padding: 22px; }
 .search-modal .modal-content { overflow: hidden; }
