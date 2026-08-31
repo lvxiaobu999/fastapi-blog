@@ -165,6 +165,45 @@ async def test_layout_includes_loading_and_session_scripts(client: AsyncClient) 
     assert ".form-actions > .verification-code-button" in site_styles.text
 
 
+async def test_layout_uses_site_logo_and_favicon(client: AsyncClient) -> None:
+    """前台和后台模板引用新增的 Logo 与 favicon 静态资源。"""
+
+    home = await client.get("/")
+    admin_categories = await client.get("/admin/categories")
+    favicon = await client.get("/static/images/favicon.ico")
+    logo = await client.get("/static/images/logo.png")
+
+    assert home.status_code == 200
+    assert admin_categories.status_code == 200
+    assert 'rel="icon"' in home.text
+    assert "/static/images/favicon.ico" in home.text
+    assert '/static/images/logo.png" alt="" width="30" height="30"' in home.text
+    assert 'data-admin-nav="categories"' in admin_categories.text
+    assert 'rel="icon"' in admin_categories.text
+    assert "/static/images/favicon.ico" in admin_categories.text
+    assert '/static/images/logo.png" alt="" width="30" height="30"' in admin_categories.text
+    assert favicon.status_code == 200
+    assert logo.status_code == 200
+    assert "image/x-icon" in home.text
+
+
+async def test_admin_categories_page_has_management_controls(client: AsyncClient) -> None:
+    """分类管理页面提供列表、编辑和删除所需的 DOM 标记。"""
+
+    response = await client.get("/admin/categories")
+    script = await client.get("/static/js/admin.js")
+
+    assert response.status_code == 200
+    assert "分类管理" in response.text
+    assert "data-category-rows" in response.text
+    assert "data-category-create" in response.text
+    assert "data-admin-category-form" in response.text
+    assert 'name="slug"' in response.text
+    assert 'name="sort_order"' in response.text
+    assert "data-action=delete-category" in script.text
+    assert "/api/admin/categories" in script.text
+
+
 async def test_layout_has_authenticated_user_menu_and_password_modal(client: AsyncClient) -> None:
     """登录导航提供头像菜单、资料入口、管理员入口和改密模态框。"""
 

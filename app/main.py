@@ -30,6 +30,7 @@ from app.routers import (
     api_activities_router,
     api_admin_router,
     api_auth_router,
+    api_categories_router,
     api_posts_router,
     api_users_router,
     comments_router,
@@ -152,6 +153,7 @@ app.include_router(pages_router)
 app.include_router(api_activities_router)
 app.include_router(api_admin_router)
 app.include_router(api_auth_router)
+app.include_router(api_categories_router)
 app.include_router(api_posts_router)
 app.include_router(comments_router)
 app.include_router(api_users_router)

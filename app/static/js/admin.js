@@ -2,7 +2,7 @@
  * 管理后台页面入口。
  *
  * 后台 HTML 只是界面外壳。启动时必须调用 /api/auth/me 验证管理员身份，之后用户
- * 写操作走 /api/admin/users，帖子写操作复用已经受 AdminUser 保护的 /api/posts。
+ * 写操作走 /api/admin/users、/api/admin/categories，帖子写操作复用已经受 AdminUser 保护的 /api/posts。
  */
 
 import {ajaxRequest, errorMessages} from "./api.js";
@@ -97,13 +97,38 @@ $(function () {
         });
     }
 
+    function loadCategories() {
+        const rows = document.querySelector("[data-category-rows]");
+        if (!rows) return;
+        ajaxRequest({url: "/api/admin/categories", auth: true}).done((categories) => {
+            rows.replaceChildren();
+            categories.forEach((category) => {
+                const row = document.createElement("tr");
+                const name = document.createElement("td"); name.textContent = category.name;
+                const slug = document.createElement("td"); slug.textContent = category.slug;
+                const sortOrder = document.createElement("td"); sortOrder.textContent = category.sort_order;
+                const actions = document.createElement("td"); actions.className = "admin-row-actions";
+                actions.append(
+                    actionButton("编辑", "btn btn-sm btn-outline-secondary", "edit-category", category.id),
+                    actionButton("删除", "btn btn-sm btn-outline-danger", "delete-category", category.id),
+                );
+                row.append(name, slug, sortOrder, actions);
+                row.dataset.category = JSON.stringify(category);
+                rows.append(row);
+            });
+            document.querySelector("[data-category-empty]").classList.toggle("d-none", categories.length > 0);
+        });
+    }
+
     function initializePage() {
         document.querySelector(`[data-admin-nav="${page}"]`)?.classList.add("active");
         if (page === "users") loadUsers();
         if (page === "posts") loadPosts();
+        if (page === "categories") loadCategories();
         if (page === "dashboard") {
             ajaxRequest({url: "/api/admin/users", auth: true}).done((users) => { document.querySelector("[data-user-total]").textContent = users.length; });
             ajaxRequest({url: "/api/posts/admin?limit=100", auth: true}).done((posts) => { document.querySelector("[data-post-total]").textContent = posts.length; });
+            ajaxRequest({url: "/api/admin/categories", auth: true}).done((categories) => { document.querySelector("[data-category-total]").textContent = categories.length; });
         }
     }
 
@@ -155,17 +180,69 @@ $(function () {
             .always(() => setButtonLoading(button, false));
     });
 
-    $(document).on("click", "[data-action=delete-user], [data-action=delete-post]", function () {
-        const isUser = this.dataset.action === "delete-user";
+    $("[data-category-create]").on("click", () => {
+        const form = document.querySelector("[data-admin-category-form]");
+        form.reset(); form.category_id.value = ""; form.sort_order.value = "0";
+        form.querySelector("[data-form-feedback]").className = "alert d-none";
+        document.querySelector("[data-category-modal-title]").textContent = "新增分类";
+        bootstrap.Modal.getOrCreateInstance(document.querySelector("#adminCategoryModal")).show();
+    });
+
+    $(document).on("click", "[data-action=edit-category]", function () {
+        const category = JSON.parse(this.closest("tr").dataset.category);
+        const form = document.querySelector("[data-admin-category-form]");
+        form.category_id.value = category.id;
+        form.name.value = category.name;
+        form.slug.value = category.slug;
+        form.sort_order.value = category.sort_order;
+        form.querySelector("[data-form-feedback]").className = "alert d-none";
+        document.querySelector("[data-category-modal-title]").textContent = "编辑分类";
+        bootstrap.Modal.getOrCreateInstance(document.querySelector("#adminCategoryModal")).show();
+    });
+
+    $("[data-admin-category-form]").on("submit", function (event) {
+        event.preventDefault();
+        const form = this;
+        const id = form.category_id.value;
+        const button = form.querySelector("[type=submit]");
+        if (!setButtonLoading(button, true, "保存中…")) return;
+        const data = {
+            name: form.name.value,
+            slug: form.slug.value,
+            sort_order: Number(form.sort_order.value),
+        };
+        ajaxRequest({
+            url: id ? `/api/admin/categories/${id}` : "/api/admin/categories",
+            method: id ? "PATCH" : "POST",
+            auth: true,
+            data,
+        })
+            .done(() => {
+                bootstrap.Modal.getInstance(document.querySelector("#adminCategoryModal")).hide();
+                loadCategories();
+            })
+            .fail((xhr) => {
+                const feedback = form.querySelector("[data-form-feedback]");
+                feedback.className = "alert alert-danger";
+                feedback.textContent = errorMessages(xhr);
+            })
+            .always(() => setButtonLoading(button, false));
+    });
+
+    $(document).on("click", "[data-action=delete-user], [data-action=delete-post], [data-action=delete-category]", function () {
+        const type = this.dataset.action.replace("delete-", "");
         pendingDelete = {
             id: this.dataset.id,
-            isUser,
+            type,
             sourceButton: this,
         };
-        document.querySelector("[data-delete-title]").textContent = `确认删除${isUser ? "用户" : "帖子"}？`;
-        document.querySelector("[data-delete-message]").textContent = isUser
+        const labels = {user: "用户", post: "帖子", category: "分类"};
+        document.querySelector("[data-delete-title]").textContent = `确认删除${labels[type]}？`;
+        document.querySelector("[data-delete-message]").textContent = type === "user"
             ? "用户账号及其关联内容将被永久删除，此操作无法撤销。"
-            : "帖子正文、评论以及相关互动数据将被永久删除。暂时隐藏内容请使用“下架”。";
+            : type === "post"
+                ? "帖子正文、评论以及相关互动数据将被永久删除。暂时隐藏内容请使用“下架”。"
+                : "分类只有在没有任何文章引用时才能删除；已被引用的分类会被服务器拒绝。";
         document.querySelector("[data-delete-feedback]").classList.add("d-none");
         deleteModal?.show();
     });
@@ -174,13 +251,19 @@ $(function () {
         if (!pendingDelete || !setButtonLoading(this, true, "删除中…")) return;
         const target = pendingDelete;
         ajaxRequest({
-            url: target.isUser ? `/api/admin/users/${target.id}` : `/api/posts/${target.id}`,
+            url: target.type === "user"
+                ? `/api/admin/users/${target.id}`
+                : target.type === "post"
+                    ? `/api/posts/${target.id}`
+                    : `/api/admin/categories/${target.id}`,
             method: "DELETE",
             auth: true,
         })
             .done(() => {
                 deleteModal?.hide();
-                target.isUser ? loadUsers() : loadPosts();
+                if (target.type === "user") loadUsers();
+                if (target.type === "post") loadPosts();
+                if (target.type === "category") loadCategories();
             })
             .fail((xhr) => {
                 const feedback = document.querySelector("[data-delete-feedback]");

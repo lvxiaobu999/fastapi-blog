@@ -1,0 +1,17 @@
+{% extends "admin/layout.html" %}
+{% block page_id %}categories{% endblock %}
+{% block content %}
+<div class="admin-page-heading"><div><span class="eyebrow">CATEGORIES</span><h1>分类管理</h1></div>
+    <button class="btn btn-primary" type="button" data-category-create>新增分类</button></div>
+<p class="admin-page-help">分类会显示在首页导航和文章编辑器中。slug 用于分类筛选地址，建议创建后保持稳定。</p>
+<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>名称</th><th>Slug</th><th>排序</th><th>操作</th></tr></thead>
+    <tbody data-category-rows></tbody></table><p class="admin-empty d-none" data-category-empty>暂无分类</p></div>
+<div class="modal fade" id="adminCategoryModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h2 class="modal-title fs-5" data-category-modal-title>新增分类</h2><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+    <form class="modal-body stacked-form" data-admin-category-form><input type="hidden" name="category_id"><div class="alert d-none" data-form-feedback></div>
+        <div><label class="form-label" for="admin-category-name">分类名称</label><input class="form-control" id="admin-category-name" name="name" maxlength="50" placeholder="例如：FastAPI" required></div>
+        <div><label class="form-label" for="admin-category-slug">Slug</label><input class="form-control" id="admin-category-slug" name="slug" maxlength="50" pattern="[a-z0-9]+(?:[-_][a-z0-9]+)*" placeholder="例如：fastapi" required><small class="form-text">仅允许小写字母、数字、连字符或下划线。</small></div>
+        <div><label class="form-label" for="admin-category-sort-order">排序值</label><input class="form-control" id="admin-category-sort-order" name="sort_order" type="number" min="0" step="1" value="0" required><small class="form-text">数值越小越靠前；相同数值按创建顺序排列。</small></div>
+        <button class="btn btn-primary" type="submit">保存分类</button>
+    </form></div></div></div>
+{% endblock %}

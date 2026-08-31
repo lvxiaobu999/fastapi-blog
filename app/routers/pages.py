@@ -166,3 +166,10 @@ async def admin_posts(request: Request):
     """渲染帖子管理工作区，数据由帖子 API 加载。"""
 
     return templates.TemplateResponse(request, "admin/posts.html", {"title": "帖子管理"})
+
+
+@router.get("/admin/categories", name="admin_categories")
+async def admin_categories(request: Request):
+    """渲染分类管理工作区，数据由管理员分类 API 加载。"""
+
+    return templates.TemplateResponse(request, "admin/categories.html", {"title": "分类管理"})

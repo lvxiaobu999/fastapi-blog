@@ -10,6 +10,7 @@
             三碗博客
         {% endif %}
     </title>
+    <link rel="icon" href="{{ url_for('static', path='images/favicon.ico') }}" type="image/x-icon">
     <script src="{{ url_for('static', path='js/bootstrap-state.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
@@ -19,7 +20,7 @@
     <nav class="navbar navbar-expand-md blog-navbar" aria-label="主导航">
         <div class="container-xl">
             <a class="navbar-brand" href="{{ url_for('home') }}">
-                <span class="brand-mark" aria-hidden="true">F</span>
+                <span class="brand-mark" aria-hidden="true"><img src="{{ url_for('static', path='images/logo.png') }}" alt="" width="30" height="30"></span>
                 <span>三碗博客</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"

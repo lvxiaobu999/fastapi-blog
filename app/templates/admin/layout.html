@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>三碗博客 - {{ title }}</title>
+    <link rel="icon" href="{{ url_for('static', path='images/favicon.ico') }}" type="image/x-icon">
     <script src="{{ url_for('static', path='js/admin-state.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/site.css') }}">
@@ -12,11 +13,12 @@
 <body class="admin-body" data-admin-page="{% block page_id %}{% endblock %}">
 <div class="admin-shell">
     <aside class="admin-sidebar">
-        <a class="admin-brand" href="{{ url_for('admin_dashboard') }}"><span class="brand-mark">F</span><span>内容后台</span></a>
+        <a class="admin-brand" href="{{ url_for('admin_dashboard') }}"><span class="brand-mark" aria-hidden="true"><img src="{{ url_for('static', path='images/logo.png') }}" alt="" width="30" height="30"></span><span>内容后台</span></a>
         <nav class="admin-nav" aria-label="后台导航">
             <a href="{{ url_for('admin_dashboard') }}" data-admin-nav="dashboard">概览</a>
             <a href="{{ url_for('admin_users') }}" data-admin-nav="users">用户管理</a>
             <a href="{{ url_for('admin_posts') }}" data-admin-nav="posts">帖子管理</a>
+            <a href="{{ url_for('admin_categories') }}" data-admin-nav="categories">分类管理</a>
         </nav>
         <a class="admin-return" href="{{ url_for('home') }}">返回博客</a>
     </aside>
