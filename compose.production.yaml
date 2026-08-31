@@ -52,7 +52,7 @@ services:
         condition: service_healthy
     environment:
       # 官方 Nginx 镜像启动时会把该值替换进 /etc/nginx/templates 下的模板。
-      APP_DOMAIN: ${APP_DOMAIN:?请设置生产域名，例如 blog.example.com}
+      APP_DOMAIN: www.sanwan.xyz
       # 只替换 APP_DOMAIN，保留 $host、$request_uri 等 Nginx 运行时变量。
       NGINX_ENVSUBST_FILTER: ^APP_DOMAIN$
     ports:
