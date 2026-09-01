@@ -1,6 +1,58 @@
-# 正式生产 Compose 只运行 FastAPI 和 Nginx。PostgreSQL 使用 RDS，Redis 使用 Tair，
-# 两者的 VPC 内网连接信息通过 APP_ENV_FILE 注入，不能写进本文件或镜像。
+# 单机正式生产 Compose：FastAPI、Nginx、PostgreSQL 和 Redis 均运行在同一台 ECS 的 Docker 中。
+# PostgreSQL/Redis 只加入 backend 内部网络，不映射到宿主机公网端口；数据通过宿主机目录持久化。
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      # 这些变量只用于首次初始化 PostgreSQL 数据目录。数据库目录已经初始化后，修改密码要
+      # 通过 PostgreSQL 管理命令完成，单纯修改环境变量不会自动修改已有账号密码。
+      POSTGRES_USER: ${POSTGRES_USER:?请设置 PostgreSQL 应用用户}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置 PostgreSQL 密码}
+      POSTGRES_DB: ${POSTGRES_DB:?请设置 PostgreSQL 数据库名}
+    volumes:
+      # 宿主机目录必须位于独立数据盘或已纳入备份，容器删除不会删除该目录。
+      - ${PG_DATA_PATH:-/opt/fastapi-blog/data/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      # Redis 密码由 Compose 专用文件注入；不会把密码写进镜像或仓库 YAML。
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请设置 Redis 密码}
+    command:
+      ["sh", "-c", "exec redis-server --requirepass \"$${REDIS_PASSWORD}\" --appendonly yes --appendfsync everysec"]
+    volumes:
+      # AOF 文件保存 Refresh Session、验证码和 OAuth state；该目录应纳入 ECS 备份。
+      - ${REDIS_DATA_PATH:-/opt/fastapi-blog/data/redis}:/data
+    healthcheck:
+      # REDISCLI_AUTH 避免把密码作为 redis-cli 的命令行参数显示或产生安全警告。
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
   app:
     build:
       context: .
@@ -13,6 +65,11 @@ services:
     image: fastapi-blog:${APP_IMAGE_TAG:-local}
     env_file:
       - ${APP_ENV_FILE:-/opt/fastapi-blog/config/app.env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     expose:
       - "8000"
     volumes:
@@ -52,7 +109,8 @@ services:
         condition: service_healthy
     environment:
       # 官方 Nginx 镜像启动时会把该值替换进 /etc/nginx/templates 下的模板。
-      APP_DOMAIN: www.sanwan.xyz
+      # 使用必填插值，避免域名漏配时生成错误的 server_name 或 HTTPS 跳转地址。
+      APP_DOMAIN: ${APP_DOMAIN:?请设置正式域名，例如 www.sanwan.xyz}
       # 只替换 APP_DOMAIN，保留 $host、$request_uri 等 Nginx 运行时变量。
       NGINX_ENVSUBST_FILTER: ^APP_DOMAIN$
     ports:
@@ -60,7 +118,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      # 目录内必须提供 fullchain.pem 和 privkey.pem；私钥不得提交 Git。
+      # 目录内必须提供 fullchain.pem 和 privkey.key；私钥不得提交 Git。
       - ${TLS_HOST_PATH:-/opt/fastapi-blog/secrets/tls}:/etc/nginx/tls:ro
     restart: unless-stopped
     logging:

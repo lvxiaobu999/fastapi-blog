@@ -30,7 +30,7 @@ server {
     server_name ${APP_DOMAIN};
 
     ssl_certificate /etc/nginx/tls/fullchain.pem;
-    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.key;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:10m;
