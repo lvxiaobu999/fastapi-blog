@@ -2,7 +2,7 @@
 # PostgreSQL/Redis 只加入 backend 内部网络，不映射到宿主机公网端口；数据通过宿主机目录持久化。
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:16-alpine
     environment:
       # 这些变量只用于首次初始化 PostgreSQL 数据目录。数据库目录已经初始化后，修改密码要
       # 通过 PostgreSQL 管理命令完成，单纯修改环境变量不会自动修改已有账号密码。
