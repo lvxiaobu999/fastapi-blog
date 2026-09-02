@@ -65,6 +65,12 @@ services:
     image: fastapi-blog:${APP_IMAGE_TAG:-local}
     env_file:
       - ${APP_ENV_FILE:-/opt/fastapi-blog/config/app.env}
+    environment:
+      # 数据库和 Redis 凭据只在 compose-prod.env 保存一份；这里在容器创建时生成连接串，
+      # 覆盖 app.env 中同名旧值，避免两个文件密码不一致导致 readiness 失败。
+      # 生产密码建议只使用字母、数字、点、短横线和下划线，避免 URI 特殊字符需要额外编码。
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy

@@ -7,6 +7,9 @@ __pycache__/
 # 环境文件可能包含数据库、Redis 和 JWT Secret，禁止进入任何镜像层。
 .env
 .env.*
+app.env
+compose-prod.env
+deploy/*.env
 !.env.example
 
 # 本地数据、上传文件和日志通过运行时挂载或外部服务提供。
@@ -30,4 +33,3 @@ htmlcov/
 .idea/
 .vscode/
 *.log
-
