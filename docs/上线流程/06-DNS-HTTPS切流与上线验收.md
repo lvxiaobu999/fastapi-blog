@@ -1,6 +1,18 @@
 # DNS、HTTPS 切流与上线验收
 
-本章把已经在 ECS 本机验收通过的站点开放给真实用户。切流前必须满足备案、证书、页面合规和
+> 当前正式架构使用 ECS 本机 Docker PostgreSQL/Redis。本文中出现的 RDS/Tair 备份、白名单或监控
+> 描述仅适用于未来托管方案；当前数据库备份对象是 `/opt/fastapi-blog/data/postgres`，Redis 备份对象是
+> `/opt/fastapi-blog/data/redis`。
+
+本章把已经在 ECS 本机验收通过的站点开放给真实用户。生产命令默认使用以下包装函数：
+
+```bash
+export APP_DOMAIN=www.sanwan.xyz  # 按实际域名修改，并与 compose-prod.env 保持一致
+export COMPOSE_ENV=/opt/fastapi-blog/config/compose-prod.env
+dc() { docker compose --env-file "$COMPOSE_ENV" -f compose.production.yaml "$@"; }
+```
+
+切流前必须满足备案、证书、页面合规和
 回滚准备；DNS 不是用来测试一个尚未健康的服务。
 
 ## 1. 切流前最终闸门
@@ -12,7 +24,7 @@
 - [ ] 正式域名证书链、私钥和到期告警已确认。
 - [ ] `curl --resolve` 的 HTTP、HTTPS、live、ready 全部通过。
 - [ ] 登录、Refresh、退出、管理员、上传和 WebSocket 已用 hosts 内测。
-- [ ] RDS 备份、media 备份、监控和回滚版本都存在。
+- [ ] PostgreSQL 数据目录、Redis AOF、media 备份、监控和回滚版本都存在。
 
 任何一项是未知状态，都先停止切流。
 
@@ -71,7 +83,7 @@ ECS 查看监听：
 sudo ss -lntp
 ```
 
-宿主机应看到 80/443。FastAPI 8000 不应作为宿主机公网监听；RDS 5432 和 Redis 6379 也不应
+宿主机应看到 80/443。FastAPI 8000 不应作为宿主机公网监听；PostgreSQL 5432 和 Redis 6379 也不应
 出现在 ECS 公网入方向规则中。
 
 ## 6. 公网 HTTP/HTTPS 验收
@@ -142,7 +154,7 @@ HSTS 当前在 Nginx 模板中注释。只有确认所有需要覆盖的域名/�
 4. 在正式开放前或维护窗口重建 app 和 Nginx 容器：
 
    ```bash
-   docker compose -f compose.production.yaml up -d --force-recreate app nginx
+   dc up -d --force-recreate app nginx
    ```
 
 5. 再访问图片，确认文件仍存在。
@@ -163,7 +175,7 @@ HSTS 当前在 Nginx 模板中注释。只有确认所有需要覆盖的域名/�
 同时查看：
 
 ```bash
-docker compose -f compose.production.yaml logs --tail=200 nginx app
+dc logs --tail=200 nginx app
 ```
 
 当前只能验证单 app 进程内广播，不能据此证明多实例广播可用。
@@ -197,9 +209,9 @@ Nginx 当前为公共接口和认证接口设置不同速率。只做受控、�
 ## 13. 日志和监控验收
 
 ```bash
-docker compose -f compose.production.yaml ps
+dc ps
 docker stats --no-stream
-docker compose -f compose.production.yaml logs --tail=200 app nginx
+dc logs --tail=200 app nginx postgres redis
 docker system df
 ```
 
@@ -208,7 +220,7 @@ docker system df
 - app 没有持续重启。
 - 日志是预期 JSON/访问日志，没有 Secret。
 - Docker 日志 `max-size=20m`、`max-file=5` 生效。
-- ECS、RDS、Tair 和证书告警联系人能收到测试告警。
+- ECS、PostgreSQL/Redis 容器和证书告警联系人能收到测试告警。
 - 磁盘、内存和连接数有初始基线。
 
 ## 14. 上线记录
@@ -220,7 +232,8 @@ ECS 实例与公网 IP：
 Git tag/commit：
 Docker Image ID：
 Alembic current/head：
-RDS 备份 ID/时间：
+PostgreSQL 备份位置/时间：
+Redis AOF 备份位置/时间：
 证书到期时间：
 验收账号负责人：
 监控告警负责人：

@@ -1,5 +1,9 @@
 # 阿里云部署错误排查与命令复盘
 
+> 当前正式部署是 ECS 单机 Docker Compose 四容器：`app`、`nginx`、`postgres`、`redis`。
+> 本目录中的 RDS/Tair 内容是旧故障记录或未来迁移参考，不是当前生产启动方式；当前连接串由
+> `/opt/fastapi-blog/config/compose-prod.env` 和 `compose.production.yaml` 自动生成。
+
 本文根据 `启动项目报错-1.txt` 的脱敏记录，以及当前仓库的 `Dockerfile`、Compose、Nginx 和
 健康接口整理。附件里的文字是故障记录，不是本项目必须照抄执行的指令；其中包含删除目录、
 输出 Secret、覆盖 Docker 配置和硬编码数据库密码等高风险操作，本文将它们标记为“曾尝试”或
@@ -27,7 +31,7 @@
 | 问题 | 证据/现象 | 正确处理 |
 |---|---|---|
 | 配置缺少 `ALLOWED_HOSTS`、`SECRET_KEY`、入口地址 | Settings 启动校验失败 | 在服务器受限的 `app.env` 中补齐，权限设为 `640`；不把 Secret 写入 Git 或日志 |
-| 没有证书却启动 `compose.production.yaml` | Nginx 引用 `fullchain.pem`/`privkey.pem` | 无域名/无证书使用 `compose.public-ip.yaml`；域名和证书齐全后才用正式 Compose |
+| 没有证书却启动 `compose.production.yaml` | Nginx 引用 `fullchain.pem`/`privkey.key` | 无域名/无证书使用 `compose.public-ip.yaml`；域名和证书齐全后才用正式 Compose |
 | HTTP + `AUTH_COOKIE_SECURE=true` | 页面能打开，但浏览器不会通过 HTTP 发送 Refresh Cookie | 仅临时公网 IP 模式使用 `PUBLIC_IP_MODE=true` 和 `AUTH_COOKIE_SECURE=false`；切 HTTPS 前恢复 `true` 并轮换密钥/会话 |
 | Docker 构建时 `uv sync` 报 DNS error | 容器无法解析 `files.pythonhosted.org`，宿主机 `curl` 正常 | 先区分宿主机 DNS、Docker daemon DNS 和包索引问题；必要时为 Docker daemon 配置可达 DNS，或通过受控 `UV_INDEX_URL` 构建参数使用镜像 |
 | 手工请求 readiness 得到 Invalid Host | `curl http://localhost:8000/health/ready` 的 Host 是 localhost，但生产白名单只有公网 IP | 诊断请求必须带 `Host: <ALLOWED_HOSTS[0]>`；仓库 Compose healthcheck 已按白名单第一个值设置 Host |
@@ -48,10 +52,10 @@
 | `sed -i ... Dockerfile`、重写 Dockerfile | 尝试加入 `UV_INDEX_URL`；第一次插入破坏了 `ENV` 续行，后续重写恢复了语法但仍把镜像源写死 | 当前仓库已改为可选 `UV_INDEX_URL` build arg；默认 Dockerfile 不绑定某个地区镜像 |
 | 覆盖 `/etc/docker/daemon.json` 并 `systemctl restart docker` | 添加公共 DNS 和 registry mirror；重启会影响宿主机所有 Docker 容器 | 不能整文件覆盖，必须备份、合并 JSON、验证后重启；公共 DNS 要符合 ECS 网络策略，不能盲抄 `8.8.8.8` |
 | `docker run ... nslookup`、宿主机 `curl` | 对比容器和宿主机 DNS/HTTPS 能力 | 这是正确的诊断方向；应分别记录“解析失败”和“TCP/HTTPS 失败” |
-| 覆盖 `compose.production.yaml` 添加 `postgres`、`redis` | 把正式 Compose 从外部 RDS/Tair 改成单机自建依赖，并增加 `depends_on` | 方向可行但不应把密码硬编码在 YAML；当前改为独立 `compose.public-ip.local-services.yaml` 覆盖层 |
-| 把 `DATABASE_URL`/`REDIS_URL` 的主机改成 `postgres`/`redis` | 让 app 使用 Compose 服务名进行内部 DNS 解析 | 只适用于本机依赖覆盖层；使用 RDS/Tair 时必须恢复托管服务内网地址 |
+| 覆盖 `compose.production.yaml` 添加 `postgres`、`redis` | 把正式 Compose 从外部 RDS/Tair 改成单机自建依赖，并增加 `depends_on` | 当前已直接写入正式 Compose；密码放在 `compose-prod.env`，不硬编码 YAML |
+| 把 `DATABASE_URL`/`REDIS_URL` 的主机改成 `postgres`/`redis` | 让 app 使用 Compose 服务名进行内部 DNS 解析 | 当前正式方案固定使用；未来迁移 RDS/Tair 时才改回托管地址 |
 | `systemctl stop/disable nginx`、手动 `kill PID` | 释放宿主机 80 端口给 Nginx 容器 | `stop` 前要确认服务归属；`disable` 会改变重启后的系统行为；不要直接 kill 未确认的 PID |
-| `docker compose ... exec app uv run alembic upgrade head` | 修改目标 PostgreSQL 数据库结构和 `alembic_version` | 这是唯一明确的数据库写操作；执行前必须确认数据库、备份和当前 Revision |
+| `docker compose ... exec app uv run --no-sync alembic upgrade head` | 修改目标 PostgreSQL 数据库结构和 `alembic_version` | 这是唯一明确的数据库写操作；执行前必须确认数据库、备份和当前 Revision |
 
 ## 4. 健康检查到底是什么
 
@@ -71,7 +75,7 @@
 ### 4.2 Docker Compose 的健康探针
 
 `compose.production.yaml` 和 `compose.public-ip.yaml` 的 `app.healthcheck` 会在容器内运行
-Python 标准库请求：
+镜像虚拟环境中的 Python 标准库请求（直接调用 `/app/.venv/bin/python`，不触发 `uv` 依赖同步）：
 
 ```text
 http://127.0.0.1:8000/health/ready
@@ -149,12 +153,11 @@ ECS 的公网 IP/EIP 是互联网入口，浏览器通过它访问 Nginx；ECS �
 
 - 正式 `Dockerfile` 恢复多行 `ENV` 和 `fastapi run` 启动方式；PyPI 镜像改为可选 build arg，
   不把地区镜像永久写死。
-- 正式 `compose.production.yaml` 恢复“FastAPI + Nginx，外部 RDS/Tair”的边界，不再保存密码。
+- 正式 `compose.production.yaml` 当前直接运行 `app`、`nginx`、`postgres`、`redis` 四个服务；密码由 `compose-prod.env` 注入。
 - 正式 `nginx/default.conf.template` 恢复 80 到 HTTPS 跳转、443 TLS、限流和 WebSocket。
 - `compose.public-ip.yaml` 与 `nginx/public-ip.conf.template` 专门服务无域名公网 IPv4 的
   HTTP 受控验收。
-- `compose.public-ip.local-services.yaml` 只作为本机 PostgreSQL/Redis 的覆盖层；密码通过
-  受限参数文件注入，不进入 YAML。
+- `compose.public-ip.local-services.yaml` 只保留给无域名临时验收；正式域名部署不要再叠加它。
 
 两条启动路径的完整指令见 [公网 IP 与域名运行文档](./02-公网IP与域名运行文档.md)。
 

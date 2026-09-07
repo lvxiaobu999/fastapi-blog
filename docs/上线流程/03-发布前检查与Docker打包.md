@@ -1,5 +1,8 @@
 # 发布前检查与 Docker 打包
 
+> 当前正式架构：ECS Docker Compose 运行 `app`、`nginx`、`postgres`、`redis` 四个容器；RDS/Tair
+> 仅为未来可选迁移目标。涉及连接串和启动命令时，以[单机 Docker 上线流程](../个人博客最简上线流程.md)为准。
+
 本章在开发机或 CI 执行。目标是产生一个可追溯、已经验证、不会携带 Secret 和本地数据的发布
 版本。生产 ECS 不用来修代码、生成 Migration 或运行完整测试。
 
@@ -70,7 +73,7 @@ $env:PYTHONPATH = (Get-Location).Path
 uv run pytest -q
 ```
 
-禁止为了发布验证让 Pytest 连接需要保留数据的开发库或生产 RDS。测试应覆盖认证、Refresh、
+禁止为了发布验证让 Pytest 连接需要保留数据的开发库或生产 PostgreSQL。测试应覆盖认证、Refresh、
 权限、文章、评论、WebSocket、健康检查和异常响应；失败时修复后重新产生发布候选。
 
 ## 6. Alembic 发布检查
@@ -88,7 +91,7 @@ uv run alembic check
 检查重点：
 
 - `heads` 应只有一个 head。
-- `current` 是当前验证数据库的版本，不代表生产 RDS。
+- `current` 是当前验证数据库的版本，不代表生产 PostgreSQL。
 - `check` 应报告没有遗漏的 Model 差异。
 - 每个待发布 Migration 的 `upgrade()` 和 `downgrade()` 都已人工阅读。
 - 新增非空字段、唯一约束、外键或数据回填已经考虑历史数据。
@@ -169,7 +172,7 @@ docker run --rm --entrypoint sh "fastapi-blog:$imageTag" -c `
   'test -f /app/app/main.py && test -f /app/alembic.ini && test -d /app/migrations/versions'
 ```
 
-应用真正启动会立即校验生产 Settings，并在 readiness 中连接 RDS/Tair，所以完整容器冒烟需要
+应用真正启动会立即校验生产 Settings，并在 readiness 中连接本机 PostgreSQL/Redis，所以完整容器冒烟需要
 一套隔离的 PostgreSQL/Redis 或 staging 环境，不能拿生产凭据在开发机随意测试。
 
 ### 10.1 静态文件的发布边界
@@ -199,7 +202,7 @@ docker compose --env-file "$COMPOSE_ENV" -f "$COMPOSE_FILE" run --rm --no-deps a
 
 ```text
 Compose 变量：APP_DOMAIN、APP_IMAGE_TAG、APP_ENV_FILE、MEDIA_HOST_PATH、TLS_HOST_PATH
-应用变量：APP_ENV_FILE 中的 ENV、DATABASE_URL、REDIS_URL、SECRET_KEY 等
+应用变量：APP_ENV_FILE 中的 ENV、SECRET_KEY 等；DATABASE_URL、REDIS_URL 由 compose-prod.env 注入
 ```
 
 在本地只做语法检查时，可使用不含真实 Secret 的有效测试环境文件：
@@ -213,7 +216,7 @@ $env:TLS_HOST_PATH = "D:/tmp/fastapi-blog/tls"
 docker compose -f compose.production.yaml config -q
 ```
 
-`config -q` 只验证 Compose 解析，不证明目录、证书、RDS/Tair 或应用 Settings 可用。不要执行
+`config -q` 只验证 Compose 解析，不证明目录、证书、PostgreSQL/Redis 或应用 Settings 可用。不要执行
 不带 `-q` 的 `config` 后把展开结果发到外部，因为展开后的 `env_file` 相关信息可能涉及环境。
 
 ## 12. 源码怎样到 ECS

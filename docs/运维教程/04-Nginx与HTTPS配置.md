@@ -1,5 +1,12 @@
 # Nginx 与 HTTPS 配置
 
+正式 ECS 命令先定义 Compose 包装函数，确保读取生产参数文件：
+
+```bash
+export COMPOSE_ENV=/opt/fastapi-blog/config/compose-prod.env
+dc() { docker compose --env-file "$COMPOSE_ENV" -f compose.production.yaml "$@"; }
+```
+
 仓库已提供 `nginx/default.conf.template`，Compose 会通过 `APP_DOMAIN` 生成实际配置。它支持
 FastAPI HTTP、5 MB 图片上传和 WebSocket 评论。以下内容用于解释关键设置：
 
@@ -30,7 +37,7 @@ server {
     server_name example.com www.example.com;
 
     ssl_certificate     /etc/nginx/tls/fullchain.pem;
-    ssl_certificate_key /etc/nginx/tls/privkey.pem;
+    ssl_certificate_key /etc/nginx/tls/privkey.key;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:10m;
@@ -66,10 +73,10 @@ server {
 ## 启用配置
 
 ```bash
-docker compose -f compose.production.yaml run --rm nginx nginx -t
-docker compose -f compose.production.yaml up -d nginx
-docker compose -f compose.production.yaml exec nginx nginx -t
-docker compose -f compose.production.yaml exec nginx nginx -s reload
+dc run --rm nginx nginx -t
+dc up -d nginx
+dc exec nginx nginx -t
+dc exec nginx nginx -s reload
 ```
 
 如果第一次还没有证书，不能直接启动引用不存在证书文件的 443 配置。先使用仅 80 的临时配置

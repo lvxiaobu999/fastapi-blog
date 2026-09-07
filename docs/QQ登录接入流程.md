@@ -193,7 +193,7 @@ QQ 互联接口不保证提供可用于本项目的真实邮箱，因此先使�
 
 ### 8.1 部署前
 
-1. 备份 RDS PostgreSQL。
+1. 备份 ECS Compose 中的 PostgreSQL（逻辑备份或数据目录快照）。
 2. 确认域名和 TLS 已生效。
 3. 确认 QQ 控制台回调地址与 `QQ_REDIRECT_URI` 完全相同。
 4. 把三项 QQ 配置注入 `app.env`，不要写入 Compose 文件。
@@ -201,18 +201,20 @@ QQ 互联接口不保证提供可用于本项目的真实邮箱，因此先使�
 
 ### 8.2 执行迁移
 
-下面命令会修改数据库结构，必须先确认连接的是目标 RDS：
+下面命令会修改数据库结构，必须先确认连接的是当前 Compose `postgres` 数据库：
 
 ```bash
-export COMPOSE_ENV=/opt/fastapi-blog/config/compose-production.env
+export APP_DOMAIN=www.sanwan.xyz
+export APP_IMAGE_TAG=$(git rev-parse --short HEAD)
+export COMPOSE_ENV=/opt/fastapi-blog/config/compose-prod.env
 docker compose --env-file "$COMPOSE_ENV" -f compose.production.yaml \
-  run --rm app uv run alembic upgrade head
+  run --rm app uv run --no-sync alembic upgrade head
 ```
 
 ### 8.3 重新构建并启动
 
 ```bash
-docker compose --env-file "$COMPOSE_ENV" -f compose.production.yaml up -d --build
+docker compose --env-file "$COMPOSE_ENV" -f compose.production.yaml up -d --build --force-recreate
 docker compose --env-file "$COMPOSE_ENV" -f compose.production.yaml ps
 ```
 
@@ -265,7 +267,7 @@ GET https://你的域名/api/auth/qq/callback
 
 - `state` 已超过默认 10 分钟；
 - 浏览器刷新或重复打开了同一个 callback；
-- Redis/Tair 中的 state 丢失；
+- Redis 容器中的 state 丢失；
 - 用户在 QQ 页面拒绝授权；
 - ECS 无法访问 `graph.qq.com`；
 - QQ Token、openid 或用户资料接口返回了异常格式。
@@ -277,7 +279,7 @@ GET https://你的域名/api/auth/qq/callback
 - 检查回调响应是否设置 `refresh_token` Cookie；
 - 正式生产必须是 HTTPS 且 `AUTH_COOKIE_SECURE=true`；
 - Cookie Path 应保持 `/api`；
-- 检查 Redis/Tair 是否可写，以及 Refresh Session TTL 是否正常；
+- 检查 `redis` 容器是否可写，以及 Refresh Session TTL 是否正常；
 - 不要把 QQ access token 当作本站 Refresh Token。
 
 ### 同一个人出现两个博客账号
