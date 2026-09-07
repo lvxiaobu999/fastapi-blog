@@ -29,7 +29,20 @@
                     {% endfor %}
                 </div>
                 <h1>{{ post.title }}</h1>
-                {% if post.cover_image_url %}<img class="post-detail-cover" src="{{ post.cover_image_url }}" alt="{{ post.title }}横图">{% endif %}
+                {% if post.cover_image_url %}
+                <div class="post-detail-cover-wrap">
+                    <img class="post-detail-cover" src="{{ post.cover_image_url }}" alt="{{ post.title }}横图">
+                    <button class="btn editor-preview-button post-cover-preview-button" type="button"
+                            data-post-cover-preview-trigger data-cover-preview-url="{{ post.cover_image_url }}"
+                            data-cover-preview-alt="{{ post.title }}横图"
+                            aria-controls="postCoverPreviewModal" aria-haspopup="dialog">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/>
+                        </svg>
+                        <span>放大查看</span>
+                    </button>
+                </div>
+                {% endif %}
                 {% if post.summary %}<p class="post-detail-summary">{{ post.summary }}</p>{% endif %}
                 <div class="post-content" id="post-viewer"></div>
                 <textarea class="d-none" id="post-markdown">{{ post.content }}</textarea>
@@ -70,6 +83,27 @@
         </section>
     </div>
 </div>
+
+{% if post.cover_image_url %}
+<div class="modal fade post-cover-preview-modal" id="postCoverPreviewModal" tabindex="-1"
+     aria-labelledby="postCoverPreviewModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="eyebrow">IMAGE</span>
+                    <h2 class="modal-title fs-5" id="postCoverPreviewModalTitle">查看完整横图</h2>
+                </div>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="关闭图片预览"></button>
+            </div>
+            <div class="modal-body">
+                <p class="post-cover-preview-status d-none" data-cover-preview-status role="status"></p>
+                <img class="post-cover-preview-image" data-cover-preview-image alt="" hidden>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock content %}
 {% block scripts %}
 <script src="{{ url_for('static', path='vendor/toastui/toastui-editor-all-3.2.2.min.js') }}"></script>

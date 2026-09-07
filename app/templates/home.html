@@ -31,12 +31,8 @@
                 <img src="{{ post.cover_image_url }}" alt="">
             </a>
             {% endif %}
-            <div class="author-avatar" aria-hidden="true">
-                {{ post.author.username[0] | upper }}
-            </div>
             <div class="post-body">
                 <div class="post-meta">
-                    <a href="#">{{ post.author.nickname }}</a>
                     <time datetime="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime("%Y-%m-%d") }}</time>
                     {% for category in post.categories %}
                     <a class="post-category" href="{{ url_for('posts') }}?category={{ category.slug | urlencode }}">

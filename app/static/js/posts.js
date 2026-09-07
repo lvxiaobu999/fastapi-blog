@@ -9,7 +9,7 @@ import {ajaxRequest, errorMessages, uploadFile} from "./api.js";
 import {setButtonLoading} from "./ui.js";
 
 function decorateCodeBlocks(root) {
-    // Toast UI 已经完成 Markdown 渲染；这里只读取语言 class 并添加视觉标签。
+    // Toast UI 已经完成 Markdown 渲染；这里补充语言标签和复制按钮。
     root.querySelectorAll("pre").forEach((pre) => {
         const code = pre.querySelector("code");
         if (!code) {
@@ -23,7 +23,79 @@ function decorateCodeBlocks(root) {
             : "text";
         pre.dataset.language = language.toUpperCase();
         pre.classList.add("rich-code-block");
+
+        // Viewer 可能因为脚本加载时序被重复初始化，按钮必须幂等创建，避免同一个代码块出现多个按钮。
+        if (!pre.querySelector("[data-copy-code]")) {
+            const copyButton = document.createElement("button");
+            copyButton.type = "button";
+            copyButton.className = "code-copy-button";
+            copyButton.dataset.copyCode = "";
+            copyButton.setAttribute("aria-label", "复制代码");
+            copyButton.textContent = "复制";
+            pre.append(copyButton);
+        }
     });
+
+    if (root.dataset.codeCopyBound === "true") {
+        return;
+    }
+    root.dataset.codeCopyBound = "true";
+
+    root.addEventListener("click", async (event) => {
+        const copyButton = event.target.closest("[data-copy-code]");
+        if (!copyButton || !root.contains(copyButton)) {
+            return;
+        }
+        const code = copyButton.closest("pre")?.querySelector("code");
+        if (!code || copyButton.disabled) {
+            return;
+        }
+
+        event.preventDefault();
+        copyButton.disabled = true;
+        const defaultLabel = "复制";
+        try {
+            await copyCodeToClipboard(code.textContent || "");
+            copyButton.textContent = "已复制";
+            copyButton.classList.add("is-copied");
+        } catch (error) {
+            // 浏览器禁用剪贴板或权限不足时，让用户看到明确反馈，不静默失败。
+            console.warn("代码复制失败", error);
+            copyButton.textContent = "复制失败";
+            copyButton.classList.remove("is-copied");
+        } finally {
+            window.setTimeout(() => {
+                copyButton.textContent = defaultLabel;
+                copyButton.classList.remove("is-copied");
+                copyButton.disabled = false;
+            }, 1600);
+        }
+    });
+}
+
+async function copyCodeToClipboard(text) {
+    // HTTPS、localhost 等安全上下文优先使用现代 Clipboard API；失败后回退到隐藏文本框方案。
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return;
+        } catch (error) {
+            // 权限策略可能拒绝 Clipboard API，继续尝试兼容性回退，而不是直接提示失败。
+        }
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    if (!copied) {
+        throw new Error("Clipboard API unavailable");
+    }
 }
 
 $(function () {
@@ -62,6 +134,55 @@ $(function () {
                 viewerElement.classList.add("post-viewer-fallback");
             }, 800);
         }
+    }
+
+    // ---------- 详情页：弹窗查看未裁剪的横图原图 ----------
+    // 使用详情页专用标记，避免与文章编辑表单中的横图预览元素发生选择器冲突。
+    const coverPreviewButton = document.querySelector("[data-post-cover-preview-trigger]");
+    const coverPreviewModal = document.querySelector("#postCoverPreviewModal");
+    const coverPreviewImage = document.querySelector("[data-cover-preview-image]");
+    const coverPreviewStatus = document.querySelector("[data-cover-preview-status]");
+    if (coverPreviewButton && coverPreviewModal && coverPreviewImage && coverPreviewStatus) {
+        const resetCoverPreview = () => {
+            // 关闭弹窗后释放原图引用；下次打开时再按需加载，避免长期占用浏览器资源。
+            coverPreviewImage.removeAttribute("src");
+            coverPreviewImage.alt = "";
+            coverPreviewImage.hidden = true;
+            coverPreviewStatus.textContent = "";
+            coverPreviewStatus.classList.add("d-none");
+        };
+
+        coverPreviewButton.addEventListener("click", () => {
+            const imageUrl = coverPreviewButton.dataset.coverPreviewUrl;
+            if (!imageUrl) {
+                return;
+            }
+
+            // 首图为了保持详情页布局使用 cover；弹窗改用原始 URL，由 CSS contain 保证完整显示。
+            coverPreviewImage.src = imageUrl;
+            coverPreviewImage.alt = coverPreviewButton.dataset.coverPreviewAlt || "文章横图";
+            coverPreviewImage.hidden = false;
+            coverPreviewStatus.textContent = "";
+            coverPreviewStatus.classList.add("d-none");
+
+            const modal = window.bootstrap?.Modal?.getOrCreateInstance(coverPreviewModal);
+            if (modal) {
+                modal.show();
+            } else {
+                // Bootstrap 加载失败时仍提供可用的原图查看入口，而不是让按钮无响应。
+                window.open(imageUrl, "_blank", "noopener,noreferrer");
+            }
+        });
+
+        coverPreviewImage.addEventListener("error", () => {
+            coverPreviewImage.hidden = true;
+            coverPreviewStatus.textContent = "图片加载失败，请稍后重试。";
+            coverPreviewStatus.classList.remove("d-none");
+        });
+        coverPreviewImage.addEventListener("load", () => {
+            coverPreviewStatus.classList.add("d-none");
+        });
+        coverPreviewModal.addEventListener("hidden.bs.modal", resetCoverPreview);
     }
 
     let editor = null;
