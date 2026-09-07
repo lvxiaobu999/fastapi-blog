@@ -42,4 +42,7 @@ USER appuser
 EXPOSE 8000
 
 # 当前 WebSocket 房间保存在进程内存，一个容器暂时只启动一个应用进程。
-CMD ["uv", "run", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+# 构建阶段已经用 uv sync --frozen 安装依赖；运行阶段使用 --no-sync，避免每次启动
+# 都重新检查/同步 uv.lock。应用只接受 Compose backend 网络中的 Nginx 请求，因此
+# 可以信任代理头，让 FastAPI 正确识别 HTTPS 和客户端协议。
+CMD ["uv", "run", "--no-sync", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -83,23 +83,40 @@ services:
       - ${MEDIA_HOST_PATH:-/opt/fastapi-blog/data/media}:/app/app/media
       # 不要挂载 /opt/fastapi-blog/data/static。app/static 属于发布版本，已在 Dockerfile 的
       # COPY app ./app 阶段写入镜像；额外挂载会覆盖镜像内新 CSS/JS/图片，导致版本不一致。
+    # Dockerfile 已提供同样的安全默认值；这里显式声明生产参数，避免未来替换基础镜像或
+    # Compose 文件时又恢复到会在启动阶段同步依赖的旧命令。--forwarded-allow-ips "*"
+    # 只适用于 app 不暴露公网、仅接受内部 Nginx 流量的部署边界。
+    command:
+      [
+        "uv",
+        "run",
+        "--no-sync",
+        "fastapi",
+        "run",
+        "app/main.py",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--proxy-headers",
+        "--forwarded-allow-ips",
+        "*",
+      ]
     restart: unless-stopped
     init: true
     healthcheck:
-      # 使用 Python 标准库检查应用入口，避免为健康检查额外安装 curl/wget。
+      # 直接使用构建阶段生成的虚拟环境 Python，健康检查不再触发 uv 的依赖检查/同步。
       test:
         [
           "CMD",
-          "uv",
-          "run",
-          "python",
+          "/app/.venv/bin/python",
           "-c",
           "import json, os, urllib.request; host=json.loads(os.environ['ALLOWED_HOSTS'])[0]; request=urllib.request.Request('http://127.0.0.1:8000/health/ready', headers={'Host': host}); urllib.request.urlopen(request, timeout=3)",
         ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 40s
     logging:
       driver: json-file
       options:

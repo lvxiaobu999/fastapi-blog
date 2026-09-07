@@ -3,7 +3,8 @@
 # 密码通过受限的 Compose 参数文件注入，不写进 YAML、镜像或 Git。
 services:
   postgres:
-    image: postgres:17-alpine
+    # 与正式 Compose 保持 PostgreSQL 16；大版本数据目录不可直接降级复用。
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${LOCAL_POSTGRES_USER:?请设置本机 PostgreSQL 用户}
@@ -30,11 +31,11 @@ services:
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${LOCAL_REDIS_PASSWORD:?请设置本机 Redis 密码}
-    command: ["sh", "-c", "exec redis-server --requirepass \"$${REDIS_PASSWORD}\" --appendonly yes"]
+    command: ["sh", "-c", "exec redis-server --requirepass \"$${REDIS_PASSWORD}\" --appendonly yes --appendfsync everysec"]
     volumes:
       - ${REDIS_DATA_PATH:-/opt/fastapi-blog/data/redis}:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,6 +49,11 @@ services:
         max-file: "5"
 
   app:
+    # 覆盖 app.env 中的托管地址，让临时公网 IP 模式连接本机依赖容器。
+    # 这组变量只用于叠加本文件时的 Compose 插值；未叠加本文件时不会影响正式域名 Compose。
+    environment:
+      DATABASE_URL: postgresql+psycopg://${LOCAL_POSTGRES_USER}:${LOCAL_POSTGRES_PASSWORD}@postgres:5432/${LOCAL_POSTGRES_DB}
+      REDIS_URL: redis://:${LOCAL_REDIS_PASSWORD}@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy

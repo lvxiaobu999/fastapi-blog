@@ -17,7 +17,12 @@ async def seeded_ids(
     seeded_categories: dict[str, int],
 ) -> tuple[int, int]:
     async with session_factory() as session:
-        user = User(username="author", email="author@example.com", hashed_password="hash")
+        user = User(
+            username="author",
+            email="author@example.com",
+            nickname="博客作者",
+            hashed_password="hash",
+        )
         session.add(user)
         await session.commit()
         post = await create_post(
@@ -27,6 +32,7 @@ async def seeded_ids(
                 content="Page body",
                 user_id=user.id,
                 category_ids=[seeded_categories["fastapi"], seeded_categories["python"]],
+                cover_image_url="/media/post_images/cover.png",
             ),
         )
         return user.id, post.id
@@ -90,6 +96,9 @@ async def test_home_lists_categories_and_filters_posts(
     assert "FastAPI文章" in fastapi_posts.text
     # 同一篇帖子同时属于 FastAPI 和 Python，两个分类页都应展示它。
     assert f"/posts/{post_id}" in python_posts.text
+    # 个人博客固定由站长发布，文章列表不再重复展示作者头像和昵称。
+    assert 'class="author-avatar"' not in all_posts.text
+    assert "博客作者" not in all_posts.text
 
 
 async def test_page_router_returns_html_404(client: AsyncClient) -> None:
@@ -185,6 +194,19 @@ async def test_layout_uses_site_logo_and_favicon(client: AsyncClient) -> None:
     assert favicon.status_code == 200
     assert logo.status_code == 200
     assert "image/x-icon" in home.text
+    assert "网站备案号" in home.text
+    assert 'href="https://beian.miit.gov.cn/"' in home.text
+    assert "琼ICP备2026012298号-1" in home.text
+    assert 'rel="noopener noreferrer"' in home.text
+    assert 'class="site-footer-main"' in home.text
+    assert 'class="site-footer-filing"' in home.text
+
+    site_styles = await client.get("/static/css/site.css")
+    assert site_styles.status_code == 200
+    assert ".site-footer {" in site_styles.text
+    assert "background: #090c0b" in site_styles.text
+    assert ".site-footer-filing" in site_styles.text
+    assert "text-align: center" in site_styles.text
 
 
 async def test_admin_categories_page_has_management_controls(client: AsyncClient) -> None:
@@ -318,6 +340,11 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert "data-post-interactions" in viewer.text
     assert "data-view-count" in viewer.text
     assert "post-view-stat" in viewer.text
+    assert "data-post-cover-preview-trigger" in viewer.text
+    assert 'data-cover-preview-url="/media/post_images/cover.png"' in viewer.text
+    assert 'id="postCoverPreviewModal"' in viewer.text
+    assert 'aria-labelledby="postCoverPreviewModalTitle"' in viewer.text
+    assert "data-cover-preview-image" in viewer.text
     assert "FastAPI" in viewer.text
     assert "Python" in viewer.text
     assert "post-view-stat" in (await client.get("/posts")).text
@@ -342,3 +369,13 @@ async def test_post_pages_include_rich_editor_and_markdown_viewer(
     assert "max-height: 420px" in site_styles.text
     assert "aspect-ratio: 16 / 9" in site_styles.text
     assert "object-fit: cover" in site_styles.text
+    assert ".post-cover-preview-image" in site_styles.text
+    assert "max-width: 100%" in site_styles.text
+    assert "max-height: calc(100vh - 180px)" in site_styles.text
+    assert "object-fit: contain" in site_styles.text
+    assert "data-post-cover-preview-trigger" in posts_script.text
+    assert "data-copy-code" in posts_script.text
+    assert "copyCodeToClipboard" in posts_script.text
+    assert "复制失败" in posts_script.text
+    assert ".code-copy-button" in site_styles.text
+    assert "is-copied" in site_styles.text
