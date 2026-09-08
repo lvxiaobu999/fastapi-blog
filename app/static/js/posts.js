@@ -280,7 +280,7 @@ $(function () {
             editor = new window.toastui.Editor({
                 el: editorElement,
                 height: "520px",
-                initialEditType: "wysiwyg",
+                initialEditType: "markdown",
                 // 桌面端并排查看 Markdown 与效果；窄屏使用标签切换，避免两个面板撑破容器。
                 previewStyle: window.matchMedia("(max-width: 767.98px)").matches
                     ? "tab"

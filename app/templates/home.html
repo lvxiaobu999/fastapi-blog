@@ -26,14 +26,18 @@
         {% if posts %}
         {% for post in posts %}
         <article class="post-card">
+            {# 暂时隐藏文章列表封面图：保留这段模板代码，后续需要恢复时取消 Jinja 注释即可。 #}
+            {#
             {% if post.cover_image_url %}
             <a class="post-card-cover" href="{{ url_for('post', post_id=post.id) }}" tabindex="-1" aria-hidden="true">
                 <img src="{{ post.cover_image_url }}" alt="">
             </a>
             {% endif %}
+            #}
             <div class="post-body">
                 <div class="post-meta">
-                    <time datetime="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime("%Y-%m-%d") }}</time>
+                    {# 暂时隐藏发布时间：文章详情页仍保留发布时间，列表恢复时删除外层 Jinja 注释即可。 #}
+                    {# <time datetime="{{ post.created_at.isoformat() }}">{{ post.created_at.strftime("%Y-%m-%d") }}</time> #}
                     {% for category in post.categories %}
                     <a class="post-category" href="{{ url_for('posts') }}?category={{ category.slug | urlencode }}">
                         {{ category.name }}

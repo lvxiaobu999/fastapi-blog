@@ -99,6 +99,9 @@ async def test_home_lists_categories_and_filters_posts(
     # 个人博客固定由站长发布，文章列表不再重复展示作者头像和昵称。
     assert 'class="author-avatar"' not in all_posts.text
     assert "博客作者" not in all_posts.text
+    # 列表暂时只突出文章内容，发布时间和封面图暂不渲染；详情页仍单独保留这些信息。
+    assert "<time" not in all_posts.text
+    assert "/media/post_images/cover.png" not in all_posts.text
 
 
 async def test_page_router_returns_html_404(client: AsyncClient) -> None:
