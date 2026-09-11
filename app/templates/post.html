@@ -1,4 +1,12 @@
 {% extends "layout.html" %}
+{% block nav_categories %}
+<ul class="navbar-nav me-auto blog-category-nav">
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('posts') }}">全部</a></li>
+    {% for category in categories %}
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('posts') }}?category={{ category.slug | urlencode }}">{{ category.name }}</a></li>
+    {% endfor %}
+</ul>
+{% endblock nav_categories %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-3.2.2.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', path='vendor/toastui/toastui-editor-plugin-code-syntax-highlight-3.0.0.min.css') }}">
@@ -10,7 +18,7 @@
             <a class="back-link" href="{{ url_for('home') }}">&larr; Back to all posts</a>
         </nav>
 
-        <article class="post-card post-detail">
+        <article class="post-card post-detail reveal">
             <div class="author-avatar" aria-hidden="true">
                 {{ post.author.username[0] | upper }}
             </div>
@@ -32,14 +40,14 @@
                 {% if post.cover_image_url %}
                 <div class="post-detail-cover-wrap">
                     <img class="post-detail-cover" src="{{ post.cover_image_url }}" alt="{{ post.title }}横图">
-                    <button class="btn editor-preview-button post-cover-preview-button" type="button"
+                    <button class="post-cover-zoom" type="button"
                             data-post-cover-preview-trigger data-cover-preview-url="{{ post.cover_image_url }}"
                             data-cover-preview-alt="{{ post.title }}横图"
-                            aria-controls="postCoverPreviewModal" aria-haspopup="dialog">
+                            aria-controls="postCoverPreviewModal" aria-haspopup="dialog"
+                            aria-label="放大查看" title="放大查看">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/>
                         </svg>
-                        <span>放大查看</span>
                     </button>
                 </div>
                 {% endif %}
@@ -59,7 +67,7 @@
             </div>
         </article>
 
-        <section class="comments-section" data-comments data-post-id="{{ post.id }}"
+        <section class="comments-section reveal" data-comments data-post-id="{{ post.id }}"
                  aria-labelledby="comments-title">
             <header class="comments-heading">
                 <div><span class="eyebrow">DISCUSSION</span><h2 id="comments-title">评论</h2></div>

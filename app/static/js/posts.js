@@ -31,7 +31,14 @@ function decorateCodeBlocks(root) {
             copyButton.className = "code-copy-button";
             copyButton.dataset.copyCode = "";
             copyButton.setAttribute("aria-label", "复制代码");
-            copyButton.textContent = "复制";
+            copyButton.setAttribute("title", "复制代码");
+            // 按钮只保留图标：复制成功后由 is-copied 类切换为对勾，文字描述通过 aria-label 提供给读屏。
+            copyButton.innerHTML =
+                '<svg class="code-copy-icon" viewBox="0 0 24 24" aria-hidden="true">' +
+                '<rect x="9" y="9" width="11" height="11" rx="2"/>' +
+                '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
+                '<svg class="code-copy-icon code-copy-icon-check" viewBox="0 0 24 24" aria-hidden="true">' +
+                '<path d="M4 12.5 9.5 18 20 6.5"/></svg>';
             pre.append(copyButton);
         }
     });
@@ -53,20 +60,19 @@ function decorateCodeBlocks(root) {
 
         event.preventDefault();
         copyButton.disabled = true;
-        const defaultLabel = "复制";
         try {
             await copyCodeToClipboard(code.textContent || "");
-            copyButton.textContent = "已复制";
             copyButton.classList.add("is-copied");
+            copyButton.setAttribute("aria-label", "已复制");
         } catch (error) {
             // 浏览器禁用剪贴板或权限不足时，让用户看到明确反馈，不静默失败。
             console.warn("代码复制失败", error);
-            copyButton.textContent = "复制失败";
             copyButton.classList.remove("is-copied");
+            copyButton.setAttribute("aria-label", "复制失败");
         } finally {
             window.setTimeout(() => {
-                copyButton.textContent = defaultLabel;
                 copyButton.classList.remove("is-copied");
+                copyButton.setAttribute("aria-label", "复制代码");
                 copyButton.disabled = false;
             }, 1600);
         }

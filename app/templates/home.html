@@ -1,39 +1,48 @@
 {% extends "layout.html" %}
+{% block nav_categories %}
+<ul class="navbar-nav me-auto blog-category-nav">
+    <li class="nav-item">
+        <a class="nav-link{% if not query.category %} active{% endif %}"
+           href="{{ url_for('posts') }}"
+           {% if not query.category %}aria-current="page"{% endif %}>全部</a>
+    </li>
+    {% for category in categories %}
+    <li class="nav-item">
+        <a class="nav-link{% if query.category == category.slug %} active{% endif %}"
+           href="{{ url_for('posts') }}?category={{ category.slug | urlencode }}"
+           {% if query.category == category.slug %}aria-current="page"{% endif %}>{{ category.name }}</a>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock nav_categories %}
 {% block content %}
+<header class="hero reveal">
+    <span class="eyebrow hero-eyebrow">WELCOME TO 三碗博客</span>
+    <h1 class="hero-title">记录技术，<span class="hero-accent">也记录思考</span></h1>
+    <p class="hero-subtitle">一个基于 FastAPI 构建的个人博客，用清晰的代码记录真实的学习过程。</p>
+    <div class="hero-actions">
+        <a class="btn btn-primary" href="#latest">开始阅读</a>
+        <a class="btn btn-outline-primary" href="{{ url_for('posts') }}">浏览全部文章</a>
+    </div>
+</header>
+
 <div class="row g-4">
-    <section class="col-lg-8" aria-label="文章列表">
+    <section class="col-lg-8" id="latest" aria-label="文章列表">
         <header class="page-heading">
             <div>
                 <span class="eyebrow">ARTICLES</span>
                 <h1>{{ selected_category.name ~ "文章" if selected_category else "最新文章" }}</h1>
             </div>
-            <p>分享开发实践、学习笔记与值得记录的想法。</p>
         </header>
-        <nav class="category-filter" aria-label="文章分类">
-            <a class="category-filter-link{% if not query.category %} active{% endif %}"
-               href="{{ url_for('posts') }}"{% if not query.category %} aria-current="page"{% endif %}>
-                全部
-            </a>
-            {% for category in categories %}
-            <a class="category-filter-link{% if query.category == category.slug %} active{% endif %}"
-               href="{{ url_for('posts') }}?category={{ category.slug | urlencode }}"
-               {% if query.category == category.slug %}aria-current="page"{% endif %}>
-                {{ category.name }}
-            </a>
-            {% endfor %}
-        </nav>
 
         {% if posts %}
         {% for post in posts %}
-        <article class="post-card">
-            {# 暂时隐藏文章列表封面图：保留这段模板代码，后续需要恢复时取消 Jinja 注释即可。 #}
-            {#
+        <article class="post-card reveal" style="--reveal-delay: {{ loop.index0 * 60 }}ms">
             {% if post.cover_image_url %}
             <a class="post-card-cover" href="{{ url_for('post', post_id=post.id) }}" tabindex="-1" aria-hidden="true">
-                <img src="{{ post.cover_image_url }}" alt="">
+                <img src="{{ post.cover_image_url }}" alt="" loading="lazy" decoding="async">
             </a>
             {% endif %}
-            #}
             <div class="post-body">
                 <div class="post-meta">
                     {# 暂时隐藏发布时间：文章详情页仍保留发布时间，列表恢复时删除外层 Jinja 注释即可。 #}
@@ -63,7 +72,7 @@
     </section>
 
     <aside class="col-lg-4">
-        <div class="sidebar-panel sidebar-sticky">
+        <div class="sidebar-panel sidebar-sticky reveal">
             <span class="eyebrow">ABOUT</span>
             <h2>关于本站</h2>
             <p>一个基于 FastAPI 构建的个人博客，用清晰的代码记录真实的学习过程。</p>

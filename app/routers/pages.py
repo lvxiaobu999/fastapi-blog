@@ -140,10 +140,12 @@ async def post_detail(request: Request, post_id: int, session: DbSession):
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
+    categories = await category_service.list_categories(session)
+
     return templates.TemplateResponse(
         request,
         "post.html",
-        {"post": post, "title": post.title},
+        {"post": post, "categories": categories, "title": post.title},
     )
 
 

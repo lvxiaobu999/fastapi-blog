@@ -29,11 +29,7 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="mainNavbar">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="{{ url_for('home') }}">文章</a>
-                    </li>
-                </ul>
+                {% block nav_categories %}{% endblock nav_categories %}
                 <div class="navbar-actions">
                     <button class="btn navbar-search-trigger" type="button"
                             data-bs-toggle="modal" data-bs-target="#searchModal"
@@ -46,9 +42,9 @@
                         <span>搜索</span>
                         <kbd>Ctrl K</kbd>
                     </button>
-                    <button class="btn btn-outline-light" type="button" data-auth-guest
+                    <button class="btn btn-outline-primary" type="button" data-auth-guest
                             data-bs-toggle="modal" data-bs-target="#loginModal">登录</button>
-                    <button class="btn btn-light" type="button" data-auth-guest
+                    <button class="btn btn-primary" type="button" data-auth-guest
                             data-bs-toggle="modal" data-bs-target="#registerModal">注册</button>
                     <button class="theme-toggle-button theme-toggle-on-nav" type="button"
                             data-theme-toggle title="切换到深色主题" aria-label="切换到深色主题">
@@ -296,6 +292,7 @@
     <script type="module" src="{{ url_for('static', path='js/posts.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/post-activities.js') }}"></script>
     <script type="module" src="{{ url_for('static', path='js/forms.js') }}"></script>
+    <script src="{{ url_for('static', path='js/reveal.js') }}"></script>
     {% block scripts %}{% endblock scripts %}
 </body>
 </html>
