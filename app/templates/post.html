@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 {% block nav_categories %}
-<ul class="navbar-nav me-auto blog-category-nav">
+<ul class="navbar-nav me-auto blog-category-nav" aria-label="文章分类">
     <li class="nav-item"><a class="nav-link" href="{{ url_for('posts') }}">全部</a></li>
     {% for category in categories %}
     <li class="nav-item"><a class="nav-link" href="{{ url_for('posts') }}?category={{ category.slug | urlencode }}">{{ category.name }}</a></li>

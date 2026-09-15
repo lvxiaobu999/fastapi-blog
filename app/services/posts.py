@@ -4,6 +4,7 @@
 """
 
 from sqlalchemy import or_, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
@@ -73,7 +74,11 @@ async def create_post(session: AsyncSession, data: PostCreate) -> Post:
         categories=categories,
     )
     session.add(post)
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
     # commit/refresh 可能使关系属性过期；统一走详情查询重新加载公开响应需要的作者和分类，
     # 避免 Pydantic 在异步上下文外触发懒加载并抛出 MissingGreenlet。
     created_post = await get_post(session, post.id)
@@ -102,7 +107,11 @@ async def update_post(session: AsyncSession, post: Post, data: PostUpdate) -> Po
     for field, value in changes.items():
         setattr(post, field, value)
 
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
     updated_post = await get_post(session, post.id)
     if updated_post is None:  # pragma: no cover - 更新期间没有删除路径。
         raise RuntimeError("Updated post could not be reloaded")
@@ -216,4 +225,8 @@ async def delete_post(session: AsyncSession, post: Post) -> None:
     """
 
     await session.delete(post)
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise

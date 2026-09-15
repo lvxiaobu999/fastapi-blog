@@ -1,6 +1,7 @@
 """评论查询与写入服务；不处理 HTTP/WebSocket 连接或广播。"""
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -90,8 +91,9 @@ async def create_comment(
             )
             .where(Comment.id == comment.id)
         )
-    except Exception:
-        # 已处理的写入异常必须回滚，避免这个 Session 停留在失败事务中。
+    except SQLAlchemyError:
+        # 数据库写入异常必须回滚，避免这个 Session 停留在失败事务中；其他编程错误
+        # 不在这里吞掉，交给全局异常处理器记录完整调用栈。
         await session.rollback()
         raise
     assert comment is not None

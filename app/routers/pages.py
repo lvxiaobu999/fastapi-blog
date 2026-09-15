@@ -53,14 +53,14 @@ async def home(
 
 @router.get("/login", name="login")
 async def login_page(request: Request):
-    """渲染登录表单；登录提交接口尚未实现。"""
+    """渲染登录表单；提交由页面脚本调用认证 API 完成。"""
 
     return templates.TemplateResponse(request, "login.html", {"title": "Login"})
 
 
 @router.get("/register", name="register")
 async def register_page(request: Request):
-    """渲染注册表单；注册提交接口尚未实现。"""
+    """渲染注册表单；提交由页面脚本调用用户注册 API 完成。"""
 
     return templates.TemplateResponse(request, "register.html", {"title": "Register"})
 

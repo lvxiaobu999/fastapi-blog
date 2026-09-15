@@ -1,4 +1,8 @@
-"""帖子 HTTP 接口；当前尚未接入具体端点。"""
+"""帖子 HTTP 接口。
+
+本模块负责文章列表、标题搜索、管理员写入和图片上传的 HTTP 契约；业务规则与事务由
+``app.services.posts`` 和 ``app.services.images`` 处理。
+"""
 
 from typing import Annotated
 

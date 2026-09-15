@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Comment, Post, PostFavorite, PostLike, PostView
@@ -137,7 +138,11 @@ async def record_view(
         )
 
     # 浏览量和足迹在同一个事务中提交：都成功才生效；提交失败则都不会完成。
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
     # 上面的 view_count 是 SQL 表达式直接在数据库里 +1，当前 post 对象未必知道新值。
     # refresh() 只重新读取 view_count 字段，让返回给前端的数字一定是数据库最新值。
     await session.refresh(post, attribute_names=["view_count"])
@@ -155,7 +160,11 @@ async def toggle_like(session: AsyncSession, post: Post, user_id: int) -> PostIn
 
     await _toggle_relation(session, PostLike, user_id, post.id)
     # commit() 是事务边界；只有提交成功，其他请求才会看到这次变化。
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
     # 不手工猜测计数加一还是减一，重新查库可得到数据库的最终真实状态。
     return await interaction_state(session, post, user_id)
 
@@ -169,7 +178,11 @@ async def toggle_favorite(session: AsyncSession, post: Post, user_id: int) -> Po
     """
 
     await _toggle_relation(session, PostFavorite, user_id, post.id)
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
     return await interaction_state(session, post, user_id)
 
 

@@ -50,9 +50,13 @@ access_logger = logging.getLogger("app.access")
 async def lifespan(_app: FastAPI):
     """应用退出时释放异步数据库连接池。"""
 
-    yield
-    await close_redis()
-    await engine.dispose()
+    try:
+        yield
+    finally:
+        # 无论应用正常退出、启动任务取消还是测试提前结束，都要释放连接池。
+        # 把清理放进 finally，避免异常路径遗留 Redis 或数据库连接。
+        await close_redis()
+        await engine.dispose()
 
 
 app = FastAPI(title=settings.project_title, lifespan=lifespan)

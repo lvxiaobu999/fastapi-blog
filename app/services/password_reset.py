@@ -15,6 +15,7 @@ from typing import Any
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import get_settings
@@ -271,7 +272,11 @@ async def confirm_password_reset(
         await redis.delete(key, _key(normalized_email, "cooldown"))
         user.hashed_password = await auth_service.hash_password(new_password)
         await refresh_session_service.revoke_user_refresh_sessions(redis, user.id)
-        await session.commit()
+        try:
+            await session.commit()
+        except SQLAlchemyError:
+            await session.rollback()
+            raise
     finally:
         # 清理锁失败时让 TTL 自动释放；如果数据库已经提交，不能把成功误报成 503。
         try:

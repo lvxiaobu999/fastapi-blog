@@ -99,9 +99,9 @@ async def test_home_lists_categories_and_filters_posts(
     # 个人博客固定由站长发布，文章列表不再重复展示作者头像和昵称。
     assert 'class="author-avatar"' not in all_posts.text
     assert "博客作者" not in all_posts.text
-    # 列表暂时只突出文章内容，发布时间和封面图暂不渲染；详情页仍单独保留这些信息。
+    # 列表暂时只突出文章内容，发布时间不渲染；横图作为文章卡片的视觉入口保留。
     assert "<time" not in all_posts.text
-    assert "/media/post_images/cover.png" not in all_posts.text
+    assert "/media/post_images/cover.png" in all_posts.text
 
 
 async def test_page_router_returns_html_404(client: AsyncClient) -> None:
@@ -207,7 +207,7 @@ async def test_layout_uses_site_logo_and_favicon(client: AsyncClient) -> None:
     site_styles = await client.get("/static/css/site.css")
     assert site_styles.status_code == 200
     assert ".site-footer {" in site_styles.text
-    assert "background: #090c0b" in site_styles.text
+    assert "background: var(--panel-bg)" in site_styles.text
     assert ".site-footer-filing" in site_styles.text
     assert "text-align: center" in site_styles.text
 

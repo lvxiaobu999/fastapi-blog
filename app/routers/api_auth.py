@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from redis.asyncio import Redis
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import RedirectResponse
 
@@ -285,7 +286,11 @@ async def change_password(
     # 先撤销会话再提交密码。Redis 失败时依赖的异常处理器返回 503，而请求级 Session
     # 关闭时会丢弃尚未提交的新哈希，避免响应失败但密码已经改变的跨存储部分提交。
     await refresh_session_service.revoke_user_refresh_sessions(redis, current_user.id)
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
     response.delete_cookie("refresh_token", path="/api")
     return success_response(request, None)
 
@@ -325,6 +330,10 @@ async def set_password(
         )
     # 与修改密码保持相同的会话撤销边界：Redis 失败时不会提交尚未 commit 的新哈希。
     await refresh_session_service.revoke_user_refresh_sessions(redis, current_user.id)
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
     response.delete_cookie("refresh_token", path="/api")
     return success_response(request, None, message="Password set successfully")

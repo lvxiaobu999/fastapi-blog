@@ -274,7 +274,11 @@ async def delete_user(session: AsyncSession, user: User) -> None:
     """
 
     await session.delete(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
 
 
 async def create_admin_managed_user(session: AsyncSession, data: AdminUserCreate) -> User:
@@ -290,7 +294,11 @@ async def create_admin_managed_user(session: AsyncSession, data: AdminUserCreate
     )
     if data.nickname:
         user.nickname = data.nickname.strip()
-        await session.commit()
+        try:
+            await session.commit()
+        except SQLAlchemyError:
+            await session.rollback()
+            raise
         await session.refresh(user)
     return user
 
@@ -310,7 +318,11 @@ async def update_admin_managed_user(
     user = await update_user(session, user, profile_data)
     if data.is_admin is not None and user.is_admin != data.is_admin:
         user.is_admin = data.is_admin
-        await session.commit()
+        try:
+            await session.commit()
+        except SQLAlchemyError:
+            await session.rollback()
+            raise
         await session.refresh(user)
     return user
 

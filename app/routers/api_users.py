@@ -1,4 +1,8 @@
-"""用户 CRUD HTTP 接口；当前阶段不包含认证和权限判断。"""
+"""用户 CRUD HTTP 接口。
+
+公开注册和资料读取不要求登录；资料更新、删除与头像上传由当前用户依赖和管理员权限
+控制。密码与 Refresh Session 由认证 Router 处理。
+"""
 
 from typing import Annotated
 
